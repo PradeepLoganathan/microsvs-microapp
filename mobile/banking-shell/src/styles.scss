@@ -1,0 +1,252 @@
+/* Ionic Framework Styles */
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
+
+/* Optional Ionic CSS utilities */
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+
+/* ============================================
+   Banking Shell - Custom Theme
+   ============================================ */
+
+:root {
+  /* Primary palette - deep navy banking theme */
+  --ion-color-primary: #1a1a2e;
+  --ion-color-primary-rgb: 26, 26, 46;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #171728;
+  --ion-color-primary-tint: #313143;
+
+  /* Secondary - accent blue */
+  --ion-color-secondary: #0f3460;
+  --ion-color-secondary-rgb: 15, 52, 96;
+  --ion-color-secondary-contrast: #ffffff;
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: #0d2e54;
+  --ion-color-secondary-tint: #274870;
+
+  /* Tertiary - vibrant accent */
+  --ion-color-tertiary: #e94560;
+  --ion-color-tertiary-rgb: 233, 69, 96;
+  --ion-color-tertiary-contrast: #ffffff;
+  --ion-color-tertiary-contrast-rgb: 255, 255, 255;
+  --ion-color-tertiary-shade: #cd3d54;
+  --ion-color-tertiary-tint: #eb5870;
+
+  /* Success */
+  --ion-color-success: #16c784;
+  --ion-color-success-rgb: 22, 199, 132;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #13af74;
+  --ion-color-success-tint: #2dcd90;
+
+  /* Warning */
+  --ion-color-warning: #ffc107;
+  --ion-color-warning-rgb: 255, 193, 7;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #e0aa06;
+  --ion-color-warning-tint: #ffc720;
+
+  /* Danger */
+  --ion-color-danger: #ea3943;
+  --ion-color-danger-rgb: 234, 57, 67;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #ce323b;
+  --ion-color-danger-tint: #ec4d56;
+
+  /* Background */
+  --ion-background-color: #f4f5f8;
+  --ion-background-color-rgb: 244, 245, 248;
+
+  /* Toolbar */
+  --ion-toolbar-background: #1a1a2e;
+  --ion-toolbar-color: #ffffff;
+
+  /* Tab bar */
+  --ion-tab-bar-background: #ffffff;
+  --ion-tab-bar-border-color: #e0e0e0;
+  --ion-tab-bar-color: #8c8c8c;
+  --ion-tab-bar-color-selected: #0f3460;
+
+  /* Card */
+  --ion-card-background: #ffffff;
+}
+
+/* Global styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+ion-content {
+  --background: var(--ion-background-color);
+}
+
+/* Banking card styles */
+.balance-card {
+  --background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+  color: #ffffff;
+  border-radius: 16px;
+  margin: 16px;
+
+  ion-card-header {
+    padding-bottom: 4px;
+  }
+
+  ion-card-content {
+    padding-top: 0;
+  }
+
+  .balance-label {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .balance-amount {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .account-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+
+    .account-detail {
+      .label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.7;
+      }
+
+      .value {
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-top: 2px;
+      }
+    }
+  }
+}
+
+/* Micro-app loader styles */
+.microapp-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+
+  ion-spinner {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+  }
+
+  .loading-text {
+    color: var(--ion-color-medium);
+    font-size: 0.9rem;
+  }
+}
+
+.microapp-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+
+  ion-icon {
+    font-size: 48px;
+    color: var(--ion-color-danger);
+    margin-bottom: 16px;
+  }
+
+  .error-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ion-color-dark);
+    margin-bottom: 8px;
+  }
+
+  .error-message {
+    font-size: 0.85rem;
+    color: var(--ion-color-medium);
+    margin-bottom: 20px;
+    max-width: 280px;
+  }
+}
+
+/* Quick actions grid */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 0 16px;
+  margin-top: 8px;
+
+  .action-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 8px;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 24px;
+      color: var(--ion-color-secondary);
+      margin-bottom: 6px;
+    }
+
+    span {
+      font-size: 0.7rem;
+      color: var(--ion-color-dark);
+      text-align: center;
+      font-weight: 500;
+    }
+  }
+}
+
+/* Section headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 16px 8px;
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ion-color-dark);
+    margin: 0;
+  }
+
+  a {
+    font-size: 0.8rem;
+    color: var(--ion-color-secondary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+}
