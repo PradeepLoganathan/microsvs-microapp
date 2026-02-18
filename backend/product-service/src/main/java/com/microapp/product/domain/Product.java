@@ -1,12 +1,14 @@
 package com.microapp.product.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public record Product(
     String productId,
     String productName,
     String category,
     String description,
     String eligibility,
-    boolean deleted
+    @JsonIgnore boolean deleted
 ) {
 
   public Product(String productId, String productName, String category,
