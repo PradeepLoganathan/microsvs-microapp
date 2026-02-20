@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 /**
  * Represents a single micro-frontend entry from the registry manifest.
@@ -33,7 +34,7 @@ interface ScriptLoadState {
 }
 
 const MANIFEST_URL =
-  'http://localhost:8079/microfrontends/manifest?channel=demo';
+  `${environment.platformBaseUrl}/microfrontends/manifest/${environment.manifestChannel}`;
 
 @Injectable({
   providedIn: 'root',
@@ -144,7 +145,10 @@ export class MicroAppService {
       }
 
       const script = document.createElement('script');
-      script.src = entry.remoteEntry;
+      // Resolve relative bundle URLs against the platform base URL
+      script.src = entry.remoteEntry.startsWith('http')
+        ? entry.remoteEntry
+        : `${environment.platformBaseUrl}${entry.remoteEntry}`;
       script.type = 'text/javascript';
       script.setAttribute('data-microapp', entry.name);
       script.setAttribute('data-version', entry.version);

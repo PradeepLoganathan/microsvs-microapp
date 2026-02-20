@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../environments/environment';
 
 interface Transaction {
   id: string;
@@ -183,7 +184,7 @@ interface StatementDetail {
   `]
 })
 export class AppComponent implements OnInit {
-  private readonly baseUrl = 'http://localhost:8082/accounts/acc-1001/statements';
+  private readonly baseUrl = `${environment.apiBaseUrl}/accounts/acc-1001/statements`;
 
   statements: StatementSummary[] = [];
   transactions: Transaction[] = [];

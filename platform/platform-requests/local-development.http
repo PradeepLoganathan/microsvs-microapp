@@ -1,0 +1,123 @@
+### Platform Service - Local Development
+### Unified micro-frontend registry + bundle CDN (Akka SDK)
+### Service runs on: http://localhost:8079
+
+@baseUrl = http://localhost:8079
+
+################################################################
+### 1. MANIFEST LIFECYCLE
+################################################################
+
+### 1.1 Seed the default manifest
+### Creates the "demo" channel with all 3 micro-apps pointing to /bundles/...
+### Idempotent — safe to call multiple times
+POST {{baseUrl}}/microfrontends/seed
+
+### 1.2 Get the manifest for the demo channel
+### This is what the shell app calls on every tab navigation
+GET {{baseUrl}}/microfrontends/manifest/demo
+
+################################################################
+### 2. VERSION SWAP DEMO (v1 -> v2)
+################################################################
+
+### 2.1 Swap statement-analysis from v1 to v2
+### After this, the shell will load the v2 bundle (teal theme, top merchants)
+PUT {{baseUrl}}/microfrontends/manifest/demo
+Content-Type: application/json
+
+{
+  "manifestVersion": "2026-02-20T01:00:00Z",
+  "channel": "demo",
+  "microfrontends": [
+    {
+      "name": "statement-details",
+      "version": "1.0.0",
+      "remoteEntry": "/bundles/statement-details/1.0.0/main.js",
+      "exposedModule": "./Module",
+      "elementTag": "mf-statement-details"
+    },
+    {
+      "name": "statement-analysis",
+      "version": "2.0.0",
+      "remoteEntry": "/bundles/statement-analysis/2.0.0/main.js",
+      "exposedModule": "./Module",
+      "elementTag": "mf-statement-analysis"
+    },
+    {
+      "name": "recommendations",
+      "version": "1.0.0",
+      "remoteEntry": "/bundles/recommendations/1.0.0/main.js",
+      "exposedModule": "./Module",
+      "elementTag": "mf-recommendations"
+    }
+  ]
+}
+
+### 2.2 Verify the swap — version should now be 2.0.0 for statement-analysis
+GET {{baseUrl}}/microfrontends/manifest/demo
+
+### 2.3 Roll back to v1
+PUT {{baseUrl}}/microfrontends/manifest/demo
+Content-Type: application/json
+
+{
+  "manifestVersion": "2026-02-20T02:00:00Z",
+  "channel": "demo",
+  "microfrontends": [
+    {
+      "name": "statement-details",
+      "version": "1.0.0",
+      "remoteEntry": "/bundles/statement-details/1.0.0/main.js",
+      "exposedModule": "./Module",
+      "elementTag": "mf-statement-details"
+    },
+    {
+      "name": "statement-analysis",
+      "version": "1.0.0",
+      "remoteEntry": "/bundles/statement-analysis/1.0.0/main.js",
+      "exposedModule": "./Module",
+      "elementTag": "mf-statement-analysis"
+    },
+    {
+      "name": "recommendations",
+      "version": "1.0.0",
+      "remoteEntry": "/bundles/recommendations/1.0.0/main.js",
+      "exposedModule": "./Module",
+      "elementTag": "mf-recommendations"
+    }
+  ]
+}
+
+################################################################
+### 3. BUNDLE SERVING
+################################################################
+
+### 3.1 Fetch statement-details bundle (v1)
+GET {{baseUrl}}/bundles/statement-details/1.0.0/main.js
+
+### 3.2 Fetch statement-analysis bundle (v1)
+GET {{baseUrl}}/bundles/statement-analysis/1.0.0/main.js
+
+### 3.3 Fetch statement-analysis bundle (v2)
+GET {{baseUrl}}/bundles/statement-analysis/2.0.0/main.js
+
+### 3.4 Fetch recommendations bundle (v1)
+GET {{baseUrl}}/bundles/recommendations/1.0.0/main.js
+
+### 3.5 Fetch a non-existent bundle (should return 404)
+GET {{baseUrl}}/bundles/does-not-exist/1.0.0/main.js
+
+### 3.6 Path traversal attempt (should return 403)
+GET {{baseUrl}}/bundles/../etc/passwd/1.0.0/main.js
+
+################################################################
+### 4. MULTI-CHANNEL SUPPORT
+################################################################
+
+### 4.1 Get manifest for a non-existent channel (should return error)
+GET {{baseUrl}}/microfrontends/manifest/staging
+
+### 4.2 Seed a custom "staging" channel with only one micro-app
+### (First need to create via the entity — use the update endpoint after seeding)
+### The seed endpoint only creates the "demo" channel

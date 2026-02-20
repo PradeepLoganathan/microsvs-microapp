@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../environments/environment';
 
 interface Recommendation {
   productId: string;
@@ -132,7 +133,7 @@ interface Recommendation {
 })
 export class AppComponent implements OnInit {
   private readonly apiUrl =
-    'http://localhost:8084/accounts/acc-1001/recommendations?statementId=stmt-2025-12';
+    `${environment.apiBaseUrl}/accounts/acc-1001/recommendations?statementId=stmt-2025-12`;
 
   recommendations: Recommendation[] = [];
   loading = false;

@@ -48,6 +48,27 @@
               ],
               "outputHashing": "all"
             },
+            "deployed": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "6kb",
+                  "maximumError": "10kb"
+                }
+              ],
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.deployed.ts"
+                }
+              ]
+            },
             "development": {
               "optimization": false,
               "extractLicenses": false,
@@ -61,6 +82,9 @@
           "configurations": {
             "production": {
               "buildTarget": "banking-shell:build:production"
+            },
+            "deployed": {
+              "buildTarget": "banking-shell:build:deployed"
             },
             "development": {
               "buildTarget": "banking-shell:build:development"

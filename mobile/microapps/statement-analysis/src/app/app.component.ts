@@ -348,7 +348,7 @@ interface AnalysisSummary {
   `]
 })
 export class AppComponent implements OnInit {
-  private readonly baseUrl = 'http://localhost:8083/accounts/acc-1001/analysis';
+  private readonly baseUrl = `${environment.apiBaseUrl}/accounts/acc-1001/analysis`;
   private readonly statementId = 'stmt-2025-12';
 
   isV2 = environment.version === 2;
