@@ -4,28 +4,8 @@ A full demo system showcasing microservices on **Akka SDK (Java)** with a mobile
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Mobile Shell (Angular 19 + Ionic 8)  :4200         │
-│  ┌──────────┐ ┌──────────────┐ ┌───────────────┐   │
-│  │Statement │ │Statement     │ │Recommendations│   │
-│  │Details   │ │Analysis v1/2 │ │               │   │
-│  └──────────┘ └──────────────┘ └───────────────┘   │
-└──────────┬──────────────────────────────────────────┘
-           │  loads manifest + JS bundles dynamically
-           ▼
-┌──────────────────┐  ┌──────────────────┐
-│ MF Registry:8079 │  │ MF CDN    :8090  │
-│ (manifest JSON)  │  │ (static files)   │
-└──────────────────┘  └──────────────────┘
+![Conceptual Architecture](docs/conceptual-architecture.png)
 
-Backend (Akka SDK Java 3.5.2):
-┌──────────────┐ ┌───────────────┐ ┌──────────────────┐ ┌────────────────┐
-│statement-svc │ │analysis-svc   │ │recommendation-svc│ │product-svc     │
-│:8082         │ │:8083          │ │:8084             │ │:8085           │
-│mock data     │ │Agent + Tools  │ │rules-based       │ │mock catalog    │
-└──────────────┘ └───────────────┘ └──────────────────┘ └────────────────┘
-```
 
 ## Prerequisites
 

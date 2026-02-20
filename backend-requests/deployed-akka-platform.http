@@ -1,0 +1,240 @@
+### ============================================================
+### Akka Platform Deployed Environment - API Test Suite
+### ============================================================
+###
+### All four services share a single hostname, differentiated
+### by URI prefix. This keeps URLs clean and manageable.
+###
+### SETUP: Expose all services on the shared hostname
+###
+###   akka services expose statement-service \
+###     --hostname banking-microapp.gcp-us-east1.akka.services \
+###     --uri-prefix /stmt
+###
+###   akka services expose product-service \
+###     --hostname banking-microapp.gcp-us-east1.akka.services \
+###     --uri-prefix /prod
+###
+###   akka services expose analysis-service \
+###     --hostname banking-microapp.gcp-us-east1.akka.services \
+###     --uri-prefix /anls \
+###     --enable-cors
+###
+###   akka services expose recommendation-service \
+###     --hostname banking-microapp.gcp-us-east1.akka.services \
+###     --uri-prefix /recs \
+###     --enable-cors
+###
+### Verify routes with:
+###   akka services list-routes
+###
+### Routing table:
+###   /stmt/*  → statement-service       (foundation layer)
+###   /prod/*  → product-service          (product catalog)
+###   /anls/*  → analysis-service         (AI analysis, CORS enabled)
+###   /recs/*  → recommendation-service   (user-facing, CORS enabled)
+###
+### --enable-cors is used for services called from a browser/mobile app.
+### ============================================================
+
+@baseUrl = https://banking-microapp.gcp-us-east1.akka.services
+@accountId = acc-1001
+@statementId = stmt-2025-12
+
+
+################################################################
+### 0. SEED DATA - Run These First!
+### Seeds mock data into statement-service and product-service.
+### Must complete before any other requests.
+################################################################
+
+### 0.1 Seed statement data (creates account acc-1001 with transactions)
+POST {{baseUrl}}/stmt/accounts/seed
+Content-Type: application/json
+
+### 0.2 Seed product catalog (creates 4 default banking products)
+POST {{baseUrl}}/prod/products/seed
+Content-Type: application/json
+
+
+################################################################
+### 1. STATEMENT SERVICE (/stmt)
+### Foundation layer - manages accounts, statements, transactions.
+### No dependencies on other services.
+################################################################
+
+### 1.1 Get all statements for an account
+GET {{baseUrl}}/stmt/accounts/{{accountId}}/statements
+
+### 1.2 Get a specific statement with its transactions
+GET {{baseUrl}}/stmt/accounts/{{accountId}}/statements/{{statementId}}
+
+### 1.3 Get all transactions for an account (across all statements)
+GET {{baseUrl}}/stmt/accounts/{{accountId}}/transactions
+
+### 1.4 Get transactions within a date range
+GET {{baseUrl}}/stmt/accounts/{{accountId}}/transactions?from=2025-01-01&to=2025-12-31
+
+### 1.5 Add a new transaction to a statement
+POST {{baseUrl}}/stmt/accounts/{{accountId}}/statements/{{statementId}}/transactions
+Content-Type: application/json
+
+{
+  "id": "txn-deployed-001",
+  "date": "2025-02-15",
+  "amount": 250.00,
+  "merchant": "Cloud Services",
+  "category": "Business"
+}
+
+
+################################################################
+### 2. PRODUCT SERVICE (/prod)
+### CRUD operations for banking products.
+### Independent - no dependencies on other services.
+################################################################
+
+### 2.1 List all products
+GET {{baseUrl}}/prod/products
+
+### 2.2 Get a specific product by ID
+GET {{baseUrl}}/prod/products/travel_rewards_card
+
+### 2.3 Create a custom product
+POST {{baseUrl}}/prod/products/prod-custom-001
+Content-Type: application/json
+
+{
+  "productId": "prod-custom-001",
+  "name": "Custom Savings Account",
+  "description": "High-yield savings for frequent savers",
+  "annualRate": 4.5,
+  "minBalance": 1000,
+  "category": "Savings",
+  "tags": ["savings", "high-yield"]
+}
+
+### 2.4 Update an existing product
+PUT {{baseUrl}}/prod/products/prod-custom-001
+Content-Type: application/json
+
+{
+  "productId": "prod-custom-001",
+  "name": "Custom Savings Account Plus",
+  "description": "Enhanced high-yield savings with bonus rewards",
+  "annualRate": 5.0,
+  "minBalance": 500,
+  "category": "Savings",
+  "tags": ["savings", "high-yield", "bonus"]
+}
+
+### 2.5 Delete a product
+DELETE {{baseUrl}}/prod/products/prod-custom-001
+
+
+################################################################
+### 3. ANALYSIS SERVICE (/anls)
+### AI-powered transaction analysis (heuristic or agent mode).
+### Depends on: statement-service (fetches statement data internally)
+################################################################
+
+### 3.1 Run analysis on a statement
+### Triggers heuristic or agent mode (configured in application.conf)
+### Internally calls: statement-service GET /accounts/{id}/statements/{sid}
+POST {{baseUrl}}/anls/accounts/{{accountId}}/analysis/run?statementId={{statementId}}
+Content-Type: application/json
+
+### 3.2 Get analysis summary (auto-runs analysis if not cached)
+GET {{baseUrl}}/anls/accounts/{{accountId}}/analysis/summary?statementId={{statementId}}
+
+
+################################################################
+### 4. RECOMMENDATION SERVICE (/recs)
+### Primary user-facing endpoint for the mobile app.
+### Orchestrates the full service chain.
+### Depends on: analysis-service → statement-service
+################################################################
+
+### 4.1 Get product recommendations
+### Full call chain:
+###   Client → recommendation-service
+###     → analysis-service (GET /accounts/{id}/analysis/summary)
+###       → statement-service (GET /accounts/{id}/statements/{sid})
+GET {{baseUrl}}/recs/accounts/{{accountId}}/recommendations?statementId={{statementId}}
+
+
+################################################################
+### 5. CROSS-SERVICE FLOW DEMONSTRATIONS
+### Test bottom-up: statements → analysis → recommendations
+################################################################
+
+### SCENARIO A: Full Recommendation Flow (3-tier cascade)
+### Triggers the entire chain. Response includes product recommendations
+### based on spending pattern analysis.
+GET {{baseUrl}}/recs/accounts/{{accountId}}/recommendations?statementId={{statementId}}
+
+### SCENARIO B: Direct Analysis Flow (2-tier)
+### Tests analysis independently. Calls statement-service internally.
+### Response includes categorized transactions and spending breakdown.
+POST {{baseUrl}}/anls/accounts/{{accountId}}/analysis/run?statementId={{statementId}}
+
+### SCENARIO C: Statement Foundation (no dependencies)
+### The base layer - works completely independently.
+### Response includes statement with transaction list.
+GET {{baseUrl}}/stmt/accounts/{{accountId}}/statements/{{statementId}}
+
+
+################################################################
+### 6. DATA INTEGRITY CHECKS
+### Run after seeding to verify the full stack is working.
+################################################################
+
+### 6.1 Verify statements exist
+GET {{baseUrl}}/stmt/accounts/{{accountId}}/statements
+
+### 6.2 Verify analysis was computed
+GET {{baseUrl}}/anls/accounts/{{accountId}}/analysis/summary?statementId={{statementId}}
+
+### 6.3 Verify recommendations were generated
+GET {{baseUrl}}/recs/accounts/{{accountId}}/recommendations?statementId={{statementId}}
+
+### 6.4 Verify product catalog is populated
+GET {{baseUrl}}/prod/products
+
+
+################################################################
+### DEPLOYMENT & TESTING GUIDE
+################################################################
+###
+### STEP-BY-STEP:
+###
+###   1. Deploy all 4 services to Akka Platform
+###   2. Expose all services on the shared hostname (see SETUP above)
+###   3. Verify routes: akka services list-routes
+###   4. Update @baseUrl if your hostname differs
+###   5. Run seed requests (Section 0) first
+###   6. Test bottom-up: statements → products → analysis → recommendations
+###   7. Run data integrity checks (Section 6) to verify everything
+###
+### SERVICE DISCOVERY (internal):
+###   Backend-to-backend calls (analysis → statement, recommendation → analysis)
+###   use Akka's internal HttpClientProvider. These calls do NOT go through
+###   the public hostname or URI prefixes - they use internal service mesh routing.
+###
+### MINIMAL EXPOSURE (production):
+###   For production, only expose what the frontend/mobile app needs:
+###     akka services expose recommendation-service --hostname ... --uri-prefix /recs --enable-cors
+###     akka services expose product-service --hostname ... --uri-prefix /prod --enable-cors
+###   Internal services (statement, analysis) communicate via service discovery.
+###
+### CORS:
+###   --enable-cors adds CORS response headers on the route.
+###   Use it for any service called directly from a browser/mobile app.
+###   Services with @Acl(principal = INTERNET) allow external traffic.
+###
+### TROUBLESHOOTING:
+###   - 404: Service not exposed, wrong hostname, or wrong URI prefix
+###   - 503: Service not yet running or still starting up
+###   - Empty analysis results: Seed statement data first (Section 0.1)
+###   - Empty product list: Seed product data first (Section 0.2)
+###   - CORS errors in browser: Ensure --enable-cors was used when exposing
