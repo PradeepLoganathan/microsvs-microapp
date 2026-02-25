@@ -10,24 +10,20 @@ import akka.javasdk.annotations.http.Put;
 import akka.javasdk.client.ComponentClient;
 import akka.javasdk.http.AbstractHttpEndpoint;
 import akka.javasdk.http.HttpResponses;
+import com.microapp.product.application.AllProductsView;
 import com.microapp.product.application.ProductEntity;
+import com.microapp.product.application.ProductSummary;
 import com.microapp.product.domain.Product;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.Collection;
 
 @Acl(allow = @Acl.Matcher(principal = Acl.Principal.ALL))
 @HttpEndpoint("/products")
 public class ProductEndpoint extends AbstractHttpEndpoint {
 
   private static final Logger logger = LoggerFactory.getLogger(ProductEndpoint.class);
-
-  private static final List<String> PRODUCT_IDS = List.of(
-      "travel_rewards_card", "health_insurance_basic",
-      "cashback_everyday_card", "bill_pay_assist"
-  );
 
   private final ComponentClient componentClient;
 
@@ -74,20 +70,12 @@ public class ProductEndpoint extends AbstractHttpEndpoint {
   }
 
   @Get("/")
-  public List<Product> getAllProducts() {
-    return PRODUCT_IDS.stream()
-        .map(id -> {
-          try {
-            return componentClient
-                .forEventSourcedEntity(id)
-                .method(ProductEntity::getProduct)
-                .invoke();
-          } catch (Exception e) {
-            return null;
-          }
-        })
-        .filter(Objects::nonNull)
-        .toList();
+  public Collection<ProductSummary> getAllProducts() {
+    return componentClient
+        .forView()
+        .method(AllProductsView::getAllProducts)
+        .invoke()
+        .products();
   }
 
   @Post("/seed")

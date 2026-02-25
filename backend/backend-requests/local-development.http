@@ -48,21 +48,23 @@ Content-Type: application/json
 ### 2.1 Get all products
 GET {{baseUrl}}:8085/products
 
-### 2.2 Get a specific product
-GET {{baseUrl}}:8085/products/prod-savings-001
+### 2.2 Seed some products
+POST {{baseUrl}}:8085/products/seed
 
-### 2.3 Create/Update a product
+
+### 2.3 Get a specific product
+GET {{baseUrl}}:8085/products/health_insurance_basic
+
+### 2.4 Create/Update a product
 POST {{baseUrl}}:8085/products/prod-custom-001
 Content-Type: application/json
 
 {
   "productId": "prod-custom-001",
-  "name": "Custom Savings Account",
-  "description": "High-yield savings for frequent savers",
-  "annualRate": 4.5,
-  "minBalance": 1000,
+  "productName": "Custom Savings Account",
   "category": "Savings",
-  "tags": ["savings", "high-yield"]
+  "description": "High-yield savings for frequent savers with competitive rates",
+  "eligibility": "Customers with regular deposit patterns"
 }
 
 
