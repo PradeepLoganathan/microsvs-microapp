@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Config Panel — Banking Demo</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="config-page">
+  <div class="config-standalone">
+    <div class="config-panel">
+      <div class="config-header">
+        <h2>Manifest Configuration</h2>
+        <p class="config-subtitle">Modify the manifest to add, remove, or version-swap micro-apps</p>
+      </div>
+
+      <!-- Connection Status -->
+      <div id="connection-status" class="connection-status disconnected">
+        <span class="status-dot"></span>
+        <span class="status-text">Phone view not connected</span>
+        <a href="index.html" target="_blank" class="open-phone-link">Open Phone View</a>
+      </div>
+
+      <div class="config-actions">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons" id="action-buttons">
+          <!-- Rendered by config-panel.js -->
+        </div>
+      </div>
+
+      <div class="config-manifest">
+        <h3>Current Manifest</h3>
+        <pre id="manifest-json" class="manifest-code"><code></code></pre>
+      </div>
+
+      <div class="config-log">
+        <h3>Event Log</h3>
+        <div id="event-log" class="event-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/mock-data.js"></script>
+  <script src="js/config-panel.js"></script>
+</body>
+</html>
