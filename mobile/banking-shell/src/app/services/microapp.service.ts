@@ -149,7 +149,12 @@ export class MicroAppService {
       script.src = entry.remoteEntry.startsWith('http')
         ? entry.remoteEntry
         : `${environment.platformBaseUrl}${entry.remoteEntry}`;
-      script.type = 'text/javascript';
+      // Micro-app bundles are built as ES modules (they end with `export ...`),
+      // so they must be injected as module scripts. Loading them as classic
+      // scripts throws "Unexpected token 'export'" before the custom element
+      // registers. The bundle endpoint sends `Access-Control-Allow-Origin: *`,
+      // which the browser requires for cross-origin module scripts.
+      script.type = 'module';
       script.setAttribute('data-microapp', entry.name);
       script.setAttribute('data-version', entry.version);
 

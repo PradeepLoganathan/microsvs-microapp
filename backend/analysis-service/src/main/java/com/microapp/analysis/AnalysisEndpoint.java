@@ -20,7 +20,10 @@ import com.typesafe.config.ConfigFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Acl(allow = @Acl.Matcher(principal = Acl.Principal.INTERNET))
+// Principal.ALL (matching statement-service and product-service) so other Akka
+// services — e.g. recommendation-service calling via httpClientFor — are allowed.
+// INTERNET-only rejected service-principal calls with 403.
+@Acl(allow = @Acl.Matcher(principal = Acl.Principal.ALL))
 @HttpEndpoint("/accounts")
 public class AnalysisEndpoint extends AbstractHttpEndpoint {
 
