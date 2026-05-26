@@ -14,6 +14,8 @@ import {
   receipt,
   analyticsOutline,
   analytics,
+  chatbubbleEllipsesOutline,
+  chatbubbleEllipses,
   bulbOutline,
   bulb,
 } from 'ionicons/icons';
@@ -38,6 +40,11 @@ import {
         <ion-tab-button tab="analysis">
           <ion-icon name="analytics-outline"></ion-icon>
           <ion-label>Analysis</ion-label>
+        </ion-tab-button>
+
+        <ion-tab-button tab="advisor">
+          <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+          <ion-label>Advisor</ion-label>
         </ion-tab-button>
 
         <ion-tab-button tab="recommendations">
@@ -71,6 +78,8 @@ export class TabsComponent {
       receipt,
       analyticsOutline,
       analytics,
+      chatbubbleEllipsesOutline,
+      chatbubbleEllipses,
       bulbOutline,
       bulb,
     });

@@ -13,6 +13,12 @@ public final class MockDataProvider {
 
   private MockDataProvider() {}
 
+  /**
+   * Flat monthly salary credit (totalCredits) so the advisor can derive a realistic
+   * monthly savings surplus (credits - debits). Without it, surplus is always negative.
+   */
+  private static final double MONTHLY_INCOME = 4000.0;
+
   public static List<Statement> getAllStatements() {
     return List.of(decemberStatement(), januaryStatement(), februaryStatement());
   }
@@ -37,7 +43,7 @@ public final class MockDataProvider {
         new Transaction("txn-015", "2025-12-30", "AT&T", 85.00, "Utilities", "Phone bill")
     );
     double total = txns.stream().mapToDouble(Transaction::amount).sum();
-    return new Statement("stmt-2025-12", "acc-1001", "2025-12-01", "2025-12-31", total, 0, txns);
+    return new Statement("stmt-2025-12", "acc-1001", "2025-12-01", "2025-12-31", total, MONTHLY_INCOME, txns);
   }
 
   private static Statement januaryStatement() {
@@ -60,7 +66,7 @@ public final class MockDataProvider {
         new Transaction("txn-115", "2026-01-30", "AT&T", 85.00, "Utilities", "Phone bill")
     );
     double total = txns.stream().mapToDouble(Transaction::amount).sum();
-    return new Statement("stmt-2026-01", "acc-1001", "2026-01-01", "2026-01-31", total, 0, txns);
+    return new Statement("stmt-2026-01", "acc-1001", "2026-01-01", "2026-01-31", total, MONTHLY_INCOME, txns);
   }
 
   private static Statement februaryStatement() {
@@ -83,6 +89,6 @@ public final class MockDataProvider {
         new Transaction("txn-215", "2026-02-18", "AT&T", 85.00, "Utilities", "Phone bill")
     );
     double total = txns.stream().mapToDouble(Transaction::amount).sum();
-    return new Statement("stmt-2026-02", "acc-1001", "2026-02-01", "2026-02-28", total, 0, txns);
+    return new Statement("stmt-2026-02", "acc-1001", "2026-02-01", "2026-02-28", total, MONTHLY_INCOME, txns);
   }
 }

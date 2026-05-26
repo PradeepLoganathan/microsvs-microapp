@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MICROAPPS_DIR="$ROOT_DIR/mobile/microapps"
-CDN_DIR="$ROOT_DIR/platform/microfrontend-cdn/www"
+CDN_DIR="$ROOT_DIR/platform/platform-service/src/main/resources/www"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -62,6 +62,10 @@ publish_microapp "statement-analysis" "2.0.0" \
 # Publish recommendations v1
 publish_microapp "recommendations" "1.0.0" \
     "$MICROAPPS_DIR/recommendations/dist/recommendations/browser"
+
+# Publish advisor v1
+publish_microapp "advisor" "1.0.0" \
+    "$MICROAPPS_DIR/advisor/dist/advisor/browser"
 
 echo ""
 echo -e "${GREEN}All micro-apps published.${NC}"

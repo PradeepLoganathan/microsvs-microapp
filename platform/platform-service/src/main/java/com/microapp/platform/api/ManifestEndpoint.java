@@ -99,6 +99,13 @@ public class ManifestEndpoint extends AbstractHttpEndpoint {
                 "/bundles/recommendations/1.0.0/main.js",
                 "./Module",
                 "mf-recommendations"
+            ),
+            new ManifestEntry(
+                "advisor",
+                "1.0.0",
+                "/bundles/advisor/1.0.0/main.js",
+                "./Module",
+                "mf-advisor"
             )
         )
     );
