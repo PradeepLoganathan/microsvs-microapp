@@ -250,3 +250,82 @@ ion-content {
     font-weight: 500;
   }
 }
+
+/* ============================================
+   Phone device frame (desktop / demo)
+   On wide viewports the whole app renders inside a phone mockup.
+   On narrow viewports (real mobile) the wrappers are transparent
+   pass-throughs, so the app fills the screen as before.
+   ============================================ */
+
+/* Preserve Ionic's full-height chain through the wrapper divs (both modes). */
+html,
+body {
+  height: 100%;
+}
+.device-frame,
+.device-screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.device-screen {
+  position: relative;
+  overflow: hidden;
+}
+.device-screen app-root,
+.device-screen ion-app {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Phone mockup — iPhone 16 Pro Max proportions (440 x 956), with a
+   Dynamic Island. Height auto-fits the viewport (min of native size and
+   94vh) and width follows the aspect ratio, so it always fits without
+   manual scale steps. Only shown on viewports large enough for it. */
+@media (min-width: 760px) and (min-height: 720px) {
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 50% -10%, #2c2c46 0%, #131320 70%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .device-frame {
+    position: relative;
+    flex: 0 0 auto;
+    height: min(956px, 94vh);
+    width: auto;
+    aspect-ratio: 440 / 956;
+    padding: 16px; /* bezel thickness */
+    background: #0b0b0f;
+    border-radius: 62px;
+    box-shadow:
+      0 44px 100px rgba(0, 0, 0, 0.6),
+      0 0 0 2px #2b2b34,
+      inset 0 0 2px 2px rgba(255, 255, 255, 0.05);
+  }
+
+  /* Dynamic Island */
+  .device-frame::after {
+    content: "";
+    position: absolute;
+    top: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 128px;
+    height: 35px;
+    background: #0b0b0f;
+    border-radius: 20px;
+    z-index: 20;
+  }
+
+  .device-screen {
+    border-radius: 48px;
+    background: #fff;
+  }
+}
