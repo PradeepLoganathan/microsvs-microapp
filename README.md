@@ -63,8 +63,8 @@ Open `http://localhost:4200` in your browser.
 | analysis-service | 8083 | AI agent transaction analysis |
 | recommendation-service | 8084 | Rules-based product recommendations |
 | product-service | 8085 | Mock product catalog |
-| microfrontend-registry | 8079 | Micro-app manifest server |
-| microfrontend-cdn | 8090 | Static micro-app bundle server |
+| advisor-service | 8086 | AI wealth advisor — conversational agent (OpenAI) |
+| platform-service | 8079 | Micro-frontend manifest + bundle server |
 | mobile banking-shell | 4200 | Ionic Angular host app |
 
 ## API Endpoints
@@ -84,8 +84,13 @@ curl http://localhost:8085/products
 # Recommendations
 curl "http://localhost:8084/accounts/acc-1001/recommendations?statementId=stmt-2025-12"
 
+# Wealth advisor (conversational agent — needs OPENAI_API_KEY)
+curl -X POST http://localhost:8086/advisor/acc-1001/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Can I afford to save for a holiday in 2 years?"}'
+
 # Manifest
-curl "http://localhost:8079/microfrontends/manifest?channel=demo"
+curl http://localhost:8079/microfrontends/manifest/demo
 ```
 
 ## Key Demo: Micro-App Live Update (v1 → v2)

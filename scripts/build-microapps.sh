@@ -49,6 +49,7 @@ build_microapp "statement-details"
 build_microapp "statement-analysis" "production"
 build_microapp "statement-analysis" "v2"
 build_microapp "recommendations"
+build_microapp "advisor"
 
 echo ""
 echo -e "${GREEN}All micro-apps built successfully.${NC}"

@@ -25,6 +25,7 @@ const SERVICES = [
   { name: 'platform-service', port: 8079 },
   { name: 'analysis-service', port: 8083 },
   { name: 'recommendation-service', port: 8084 },
+  { name: 'advisor-service', port: 8086 },
 ];
 const SEED_TARGETS = [
   ['statement-service', 'http://localhost:8082/accounts/seed'],

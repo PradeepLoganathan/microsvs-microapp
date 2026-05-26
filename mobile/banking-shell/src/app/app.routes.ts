@@ -26,6 +26,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'advisor',
+        loadComponent: () =>
+          import('./advisor/advisor.component').then(
+            (m) => m.AdvisorComponent
+          ),
+      },
+      {
         path: 'recommendations',
         loadComponent: () =>
           import('./recommendations/recommendations.component').then(

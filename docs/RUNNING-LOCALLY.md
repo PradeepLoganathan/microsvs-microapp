@@ -60,6 +60,7 @@ run server-side in the helper, so there are no CORS issues.
 | 3 | **platform-service** | 8079 | Micro-frontend manifest + JS bundles | — |
 | 4 | **analysis-service** | 8083 | Spending analysis (heuristic) | statement-service |
 | 5 | **recommendation-service** | 8084 | Rule-based recommendations | analysis-service |
+| 6 | **advisor-service** | 8086 | AI wealth advisor — conversational agent (OpenAI) | statement + analysis + product |
 | — | **banking-shell** (UI) | 4200 | Ionic/Angular host app | platform-service (+ the above) |
 
 **Why this order:** the chain `statement → analysis → recommendation` is
@@ -88,7 +89,18 @@ mvn -f backend/analysis-service/pom.xml clean compile exec:java
 
 # 5. recommendation-service  (:8084)   — needs #4 running
 mvn -f backend/recommendation-service/pom.xml clean compile exec:java
+
+# 6. advisor-service  (:8086)   — AI wealth advisor; needs #1, #4, and product running.
+#    Set OPENAI_API_KEY in this shell FIRST for real answers (without it, the chat
+#    replies with a graceful "talk to a human advisor" fallback rather than crashing).
+export OPENAI_API_KEY=sk-...
+mvn -f backend/advisor-service/pom.xml clean compile exec:java
 ```
+
+The advisor is also the **Advisor** tab in the UI (a chat micro-app, `mf-advisor`).
+Try: *"Can I afford to save for a holiday in 2 years?"* — it grounds the answer in
+the account's real credits/debits, projects affordability, proposes a tabung goal,
+and offers a human handoff.
 
 > Tip: `clean` forces a full rebuild. After the first run you can drop it
 > (`mvn -f ... compile exec:java`) for faster restarts.

@@ -6,7 +6,7 @@ set -uo pipefail
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 ACCT="acc-1001"; STMT="stmt-2025-12"
-PORTS=(8082 8085 8079 8083 8084)
+PORTS=(8082 8085 8079 8083 8084 8086)
 
 echo -e "${CYAN}Waiting for services (ports: ${PORTS[*]})...${NC}"
 ready=0
