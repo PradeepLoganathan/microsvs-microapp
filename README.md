@@ -1,6 +1,17 @@
 # Microservices + Micro-App Banking Demo
 
-A full demo system showcasing microservices on **Akka SDK (Java)** with a mobile banking app built on **Angular 19 + Ionic 8**, delivering independently-updatable micro-app UIs.
+A full demo system showcasing microservices on **Akka SDK (Java 21)** with a mobile banking app built on **Angular 19 + Ionic 8**, delivering independently-updatable micro-app UIs. It's the running prototype for an Islamic-banking "next-gen app" — a complete customer journey assembled from a handful of Akka building blocks (event-sourced entities, workflows, an AI agent) behind config-driven micro-frontends.
+
+## The demo journey ("Sara's Day")
+
+A prospective customer goes from stranger → engaged customer, entirely in the app:
+
+1. **Pre-login** — cold open shows a landing page (no account yet).
+2. **Register** → an instant **personalized welcome offer**; stubbed eKYC → full customer. *(customer-service — one event-sourced id evolves VISITOR→REGISTERED→CUSTOMER)*
+3. **Onboard** — open a **CASA** account; abandon mid-flow, reopen → it **resumes exactly where you left off**; then add **Takaful** via a distinct journey. *(onboarding-service — resumable Akka Workflows)*
+4. **In the app** — balances, statements, spending analysis, product tips.
+5. **AI wealth advisor ⭐** — ask *"can I afford to save for a holiday in 2 years?"*; the agent uses real account data, reasons, and proposes a goal with a human handoff. *(advisor-service — Akka Agent + function tools, OpenAI)*
+6. **Config-driven UI** — micro-apps swap live (e.g. Statement Analysis v1→v2) by changing a manifest — no rebuild, no app-store release.
 
 ## Architecture
 
@@ -14,45 +25,43 @@ A full demo system showcasing microservices on **Akka SDK (Java)** with a mobile
 - **Node.js 20+** and npm
 - **curl** (for testing)
 - Akka SDK repository access (configured in `~/.m2/settings.xml`)
+- *(optional)* `OPENAI_API_KEY` — for live AI wealth-advisor answers (everything else runs fully offline)
+- *(optional)* the [Akka CLI](https://doc.akka.io/reference/cli/installation.html) — for `akka local console` and cloud deploy
 
 ## Quick Start
 
-### 1. Start Backend + Platform Services
+> Full local runbook (manual service-by-service flow + troubleshooting): **[docs/RUNNING-LOCALLY.md](docs/RUNNING-LOCALLY.md)**.
+
+### Option A — Demo Console (one command)
 
 ```bash
-# macOS/Linux
-./scripts/run-all.sh
-
-# Windows
-.\scripts\run-all.ps1
+./scripts/demo-console.sh        # opens http://localhost:9700
 ```
 
-This starts all 6 services and prints a summary table.
+A small operator console: click **▶ Start everything** to launch all services **and** the UI (≈1–2 min — watch the progress bar), **Seed / reset data**, flip the Statement Analysis micro-app **v1 ⇄ v2** live, and watch service health. Then open the banking app at **http://localhost:4200**.
 
-### 2. Build & Publish Micro-Apps
+### Option B — scripts
 
 ```bash
-# Build all micro-apps (v1 and v2)
-./scripts/build-microapps.sh
-
-# Publish to CDN
-./scripts/publish-microapps.sh
+./scripts/run-local.sh                                 # all services, started in order + seeded
+cd mobile/banking-shell && npm install && npm start    # UI on http://localhost:4200
 ```
 
-### 3. Start Mobile App
+### Stop everything
 
 ```bash
-cd mobile/banking-shell
-npm install
-npx ionic serve
+./scripts/stop-local.sh
 ```
 
-Open `http://localhost:4200` in your browser.
+> **OpenAI key (optional):** `export OPENAI_API_KEY=sk-...` before starting for real wealth-advisor answers; without it the advisor gives a graceful "talk to a human" fallback.
 
-### 4. Stop Everything
+### Rebuilding micro-apps (only if you change their code)
+
+Bundles are pre-built and served by platform-service. To rebuild + republish:
 
 ```bash
-./scripts/stop-all.sh
+./scripts/build-microapps.sh      # ng build each micro-app
+./scripts/publish-microapps.sh    # copy bundles into platform-service
 ```
 
 ## Service Ports
@@ -109,51 +118,66 @@ curl http://localhost:8079/microfrontends/manifest/demo
 
 ## Key Demo: Micro-App Live Update (v1 → v2)
 
-1. With everything running, open the mobile app and go to **Statement Analysis** tab
-2. You see **v1** — basic category totals table
-3. Edit `platform/microfrontend-registry/manifest.json`:
-   - Change `StatementAnalysis` version from `1.0.0` to `2.0.0`
-   - Change its `remoteEntry` URL from `.../1.0.0/main.js` to `.../2.0.0/main.js`
-4. Refresh the browser
-5. Statement Analysis now shows **v2** — with top merchants section and "v2" badge
-6. **Backend was never restarted** — only the frontend bundle was swapped
+The Statement Analysis micro-app ships in two versions, both already published to platform-service. Switch between them **without rebuilding or restarting anything** — it's a manifest change:
 
-## Agentic AI: analysis-service
+- **Easiest:** in the Demo Console (`./scripts/demo-console.sh`), use the **Statement Analysis — live version** toggle (**v1 ⇄ v2**).
+- **Or via the manifest API** (bump `statement-analysis` to `2.0.0` in the `demo` channel):
+  ```bash
+  curl http://localhost:8079/microfrontends/manifest/demo            # inspect current versions
+  curl -X PUT http://localhost:8079/microfrontends/manifest/demo \
+    -H 'Content-Type: application/json' -d '<manifest with statement-analysis at 2.0.0>'
+  ```
 
-The analysis-service demonstrates the **Akka Agent** construct with function tools:
+Then **hard-refresh the browser** (a custom element can't be redefined in an already-loaded page): the Analysis tab gains a **Top Merchants** section + a **"V2"** badge — and the **backend was never touched**. That's the "change the UI at the speed of business" proof.
 
-- `TransactionAnalysisAgent` extends `Agent` with `@FunctionTool` methods
-- Tools: `fetchTransactions`, `categorizeTransaction`, `persistAnalysis`
-- Default mode: **heuristic** (deterministic, no LLM needed)
-- Agent mode: Set `ANALYSIS_MODE=agent` and `OPENAI_API_KEY` env vars
+## Agentic AI
+
+Two services use the **Akka Agent** construct with `@FunctionTool` methods:
+
+- **advisor-service** (the headline) — `WealthAdvisorAgent`: a conversational, Shariah-aware advisor that grounds answers in the customer's real data via tools (`getAccountSummary`, `getSpendingProfile`, `projectAffordability`, `listProducts`, `requestHumanHandoff`), proposes exactly one action, and defers money-movement to a human. Needs `OPENAI_API_KEY`.
+- **analysis-service** — `TransactionAnalysisAgent`: spending categorizer. Default mode **heuristic** (deterministic, no LLM); set `ANALYSIS_MODE=agent` + `OPENAI_API_KEY` for the agent path.
 
 ## Project Structure
 
 ```
 backend/
-  statement-service/     Akka SDK — mock statement data
-  analysis-service/      Akka SDK — Agent + heuristic categorizer
-  recommendation-service/ Akka SDK — rules-based recommendations
-  product-service/       Akka SDK — mock product catalog
+  statement-service/      mock statements & transactions (ESE + View)
+  product-service/        product catalog (ESE + View)
+  analysis-service/       spending analysis (Agent + heuristic categorizer)
+  recommendation-service/ rule-based recommendations
+  advisor-service/        K1 — conversational wealth advisor (Agent + function tools)
+  onboarding-service/     K2 — resumable CASA + Takaful onboarding (Workflows)
+  customer-service/       K3 — customer lifecycle (ESE) + welcome offer
 platform/
-  microfrontend-registry/  Manifest JSON server
-  microfrontend-cdn/       Static file server for micro-app bundles
+  platform-service/       micro-frontend manifest (ESE) + JS bundle server
 mobile/
-  banking-shell/           Ionic Angular host app
-  microapps/
-    statement-details/     Web Component micro-app
-    statement-analysis/    Web Component micro-app (v1 + v2)
-    recommendations/       Web Component micro-app
+  banking-shell/          Ionic/Angular host (pre-login gate + tabbed app, phone device frame)
+  microapps/              web-component micro-apps (Angular Elements):
+    prelogin/                 K3 — pre-login + register + welcome offer
+    onboarding/               K2 — CASA/Takaful resumable wizard
+    advisor/                  K1 — chat with the wealth advisor
+    statement-details/        statements list
+    statement-analysis/       spending analysis (v1 + v2)
+    recommendations/          product tips
 scripts/
-  run-all.sh / .ps1        Start all services
-  stop-all.sh / .ps1       Stop all services
-  build-microapps.sh / .ps1  Build micro-app bundles
-  publish-microapps.sh / .ps1  Publish to CDN
+  run-local.sh            start all services (background, seeded)
+  stop-local.sh           stop all services + the UI
+  smoke-local.sh          seed + curl every endpoint (PASS/FAIL)
+  demo-console.sh         operator Demo Console (start/stop/seed/version-toggle/health)
+  build-microapps.sh      build micro-app bundles
+  publish-microapps.sh    publish bundles into platform-service
+  warp/                   Warp launch configuration (one pane per service)
+docs/
+  RUNNING-LOCALLY.md      full local run + demo runbook
 ```
+
+> Note: the older `run-all.sh` / `stop-all.sh` scripts are stale (they reference removed services) — use `run-local.sh` / `stop-local.sh` or the Demo Console.
 
 ## Troubleshooting
 
-- **Port already in use**: Run `./scripts/stop-all.sh` first, or check with `lsof -i :PORT`
-- **Service won't start**: Check `logs/<service>.log` for errors
-- **Maven auth errors**: Ensure Akka SDK repo is configured in `~/.m2/settings.xml`
-- **Clean start**: `./scripts/run-all.sh --clean` wipes logs and PID files
+- **Port already in use**: run `./scripts/stop-local.sh` first, or check with `lsof -i :PORT`
+- **Service won't start**: check `logs/<service>.log` for errors
+- **Maven auth errors**: ensure the Akka SDK repo is configured in `~/.m2/settings.xml`
+- **Fresh build**: `./scripts/run-local.sh --clean`
+- **Advisor replies "talk to a human"**: set `OPENAI_API_KEY` before starting advisor-service
+- **Resume demo (onboarding / pre-login)**: "abandon" means closing/refreshing the *app*, not restarting the service — the local dev journal is in-memory, so a service restart wipes in-progress applications/visitors
