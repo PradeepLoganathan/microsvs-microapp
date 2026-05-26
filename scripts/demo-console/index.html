@@ -33,7 +33,17 @@
   .dot { width: 10px; height: 10px; border-radius: 50%; background: #555; box-shadow: 0 0 0 0 rgba(0,0,0,0); }
   .dot.up { background: var(--accent2); box-shadow: 0 0 10px rgba(22,199,132,.7); }
   .dot.down { background: var(--danger); }
+  .dot.starting { background: var(--warn); box-shadow: 0 0 10px rgba(255,193,7,.6); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
   .state { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+
+  /* startup progress */
+  .progress { margin-bottom: 14px; }
+  .progress .ptext { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .progress .ptext b { color: var(--ink); }
+  .progress .bar { height: 6px; background: var(--panel2); border-radius: 999px; overflow: hidden; }
+  .progress .fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--warn), var(--accent2)); transition: width .4s ease; }
+  .progress.ready .fill { background: var(--accent2); }
 
   /* buttons */
   .btns { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -47,6 +57,10 @@
   button.primary { background: var(--accent); border-color: var(--accent); }
   button.danger:hover { border-color: var(--danger); }
   button.ghost { background: transparent; }
+  button.ok { border-color: var(--accent2); color: var(--accent2); }
+  button.warn { border-color: var(--warn); color: var(--warn); }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin360 .7s linear infinite; }
+  @keyframes spin360 { to { transform: rotate(360deg); } }
 
   /* version toggle */
   .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
@@ -73,6 +87,10 @@
     <!-- services -->
     <section class="card">
       <h2>Services</h2>
+      <div class="progress" id="progress" style="display:none">
+        <div class="ptext"><span id="pstatus">—</span><span id="pelapsed"></span></div>
+        <div class="bar"><div class="fill" id="pfill"></div></div>
+      </div>
       <div id="services"><div class="svc"><span class="name">loading…</span></div></div>
     </section>
 
@@ -84,7 +102,7 @@
         <button id="stopBtn" class="danger" onclick="act('stop')">■ Stop everything</button>
         <button id="seedBtn" class="ghost" onclick="act('seed')">↻ Seed / reset data</button>
       </div>
-      <div class="vmeta">Start launches all 5 services + the UI shell, and seeds (≈1–2 min; first run also installs UI deps). Stop frees all the ports incl. the UI.</div>
+      <div class="vmeta">Start launches all services + the UI shell, and seeds (≈1–2 min; first run also installs UI deps). Watch the progress bar above. Stop frees all the ports incl. the UI.</div>
       <div style="margin-top:16px"><a class="link" href="http://localhost:4200" target="_blank" rel="noopener">↗ Open the banking app (:4200)</a></div>
     </section>
 
@@ -107,20 +125,58 @@
 <script>
   const $ = (s) => document.querySelector(s);
   let busy = false;
+  // Track an in-progress "Start" so a still-booting service shows "starting…" (amber)
+  // instead of "down" (red). Persisted so a console reload mid-startup keeps the cue.
+  let startAt = Number(localStorage.getItem('mbsb-start-at') || 0);
+  const START_WINDOW = 180000; // 3 min
+
+  function isStarting() { return startAt > 0 && (Date.now() - startAt) < START_WINDOW; }
+  function clearStarting() { startAt = 0; localStorage.removeItem('mbsb-start-at'); }
+  function elapsed() {
+    const s = Math.max(0, Math.floor((Date.now() - startAt) / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
 
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('show');
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
+  function renderProgress(up, total, starting, allUp) {
+    const p = $('#progress');
+    if (!starting && !allUp) { p.style.display = 'none'; return; } // idle → hide
+    p.style.display = 'block';
+    p.classList.toggle('ready', allUp);
+    $('#pfill').style.width = Math.round((up / total) * 100) + '%';
+    if (allUp) {
+      $('#pstatus').innerHTML = '✓ All ' + total + ' services ready';
+      $('#pelapsed').textContent = '';
+    } else {
+      $('#pstatus').innerHTML = 'Starting… <b>' + up + '/' + total + '</b> ready';
+      $('#pelapsed').textContent = elapsed();
+    }
+  }
+
   async function refresh() {
     try {
       const s = await (await fetch('/api/status')).json();
-      $('#services').innerHTML = s.services.map((x) => `
-        <div class="svc">
+      const svcs = s.services;
+      const up = svcs.filter((x) => x.up).length;
+      const total = svcs.length;
+      const allUp = total > 0 && up === total;
+      if (allUp) clearStarting();
+      const starting = isStarting() && !allUp;
+
+      $('#services').innerHTML = svcs.map((x) => {
+        const state = x.up ? 'up' : (starting ? 'starting' : 'down');
+        const label = x.up ? 'up' : (starting ? 'starting…' : 'down');
+        return `<div class="svc">
           <span><span class="name">${x.name}</span><span class="port">:${x.port}</span></span>
-          <span class="state"><span class="dot ${x.up ? 'up' : 'down'}"></span>${x.up ? 'up' : 'down'}</span>
-        </div>`).join('');
+          <span class="state"><span class="dot ${state}"></span>${label}</span>
+        </div>`;
+      }).join('');
+
+      renderProgress(up, total, starting, allUp);
       $('#curVer').textContent = s.version || '— (platform not seeded)';
       document.querySelectorAll('#seg button').forEach((b) =>
         b.classList.toggle('active', b.dataset.v === s.version));
@@ -129,17 +185,41 @@
     }
   }
 
+  const BTN = { start: 'startBtn', stop: 'stopBtn', seed: 'seedBtn' };
+  const LABEL = { start: '▶ Start everything', stop: '■ Stop everything', seed: '↻ Seed / reset data' };
+  const BUSY = { start: 'Starting…', stop: 'Stopping…', seed: 'Seeding…' };
+
+  function flashBtn(btn, html, cls, ms) {
+    btn.innerHTML = html; btn.classList.add(cls);
+    setTimeout(() => { btn.innerHTML = LABEL[btn._kind]; btn.classList.remove(cls); }, ms);
+  }
+
   async function act(kind) {
     if (busy) return; busy = true;
-    const labels = { start: 'Starting services…', stop: 'Stopping services…', seed: 'Seeding…' };
-    toast(labels[kind]);
+    const btn = $('#' + BTN[kind]); btn._kind = kind;
+    Object.values(BTN).forEach((id) => ($('#' + id).disabled = true));
+    btn.innerHTML = '<span class="spin"></span> ' + BUSY[kind];
     try {
       const r = await fetch('/api/' + kind, { method: 'POST' });
       const j = await r.json();
-      if (kind === 'seed') toast('Seed: ' + Object.entries(j).map(([k, v]) => `${k}=${v}`).join('  '));
-      else if (kind === 'start') toast('Start triggered — watch the dots turn green (≈1–2 min).');
-      else toast('Stopped.');
-    } catch (e) { toast('Error: ' + e); }
+      if (kind === 'start') {
+        startAt = Date.now(); localStorage.setItem('mbsb-start-at', String(startAt));
+        btn.innerHTML = LABEL.start;
+        toast('Starting… watch the progress bar (first run ≈1–2 min).');
+      } else if (kind === 'stop') {
+        clearStarting(); btn.innerHTML = LABEL.stop; toast('Stopped.');
+      } else {
+        // seed — quick; give an inline result cue on the button + a detail toast
+        const entries = Object.entries(j);
+        const ok = entries.filter(([, v]) => v === 200).length;
+        const all = entries.length;
+        const good = ok === all;
+        toast('Seed ' + ok + '/' + all + '  ·  ' + entries.map(([k, v]) => k.replace('-service', '') + '=' + v).join('  '));
+        flashBtn(btn, good ? '✓ Seeded ' + ok + '/' + all : '⚠ ' + ok + '/' + all + ' — start services first',
+            good ? 'ok' : 'warn', 2200);
+      }
+    } catch (e) { toast('Error: ' + e); btn.innerHTML = LABEL[kind]; }
+    Object.values(BTN).forEach((id) => ($('#' + id).disabled = false));
     busy = false;
     refresh();
   }
@@ -156,7 +236,7 @@
   }
 
   refresh();
-  setInterval(refresh, 3000);
+  setInterval(refresh, 2000);
 </script>
 </body>
 </html>

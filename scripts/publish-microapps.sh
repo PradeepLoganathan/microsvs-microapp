@@ -71,6 +71,10 @@ publish_microapp "advisor" "1.0.0" \
 publish_microapp "onboarding" "1.0.0" \
     "$MICROAPPS_DIR/onboarding/dist/onboarding/browser"
 
+# Publish prelogin v1
+publish_microapp "prelogin" "1.0.0" \
+    "$MICROAPPS_DIR/prelogin/dist/prelogin/browser"
+
 echo ""
 echo -e "${GREEN}All micro-apps published.${NC}"
 echo ""
