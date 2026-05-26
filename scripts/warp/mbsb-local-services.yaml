@@ -1,0 +1,45 @@
+---
+# Warp Launch Configuration — MBSB local services.
+# Opens one window: a "services" tab with a live pane per service, and a
+# "seed + smoke" tab that waits for them, seeds data, and verifies endpoints.
+#
+# Install:  cp scripts/warp/mbsb-local-services.yaml ~/.warp/launch_configurations/
+# Use:      Warp Command Palette -> "Open a Launch Configuration" -> "MBSB Local Services"
+# Stop:     ./scripts/stop-local.sh   (or Ctrl-C each pane)
+#
+# NOTE: cwd must be absolute (Warp does not expand ~). Paths below are hard-coded
+# to this checkout: /Users/pradeep/source/repos/microsvs-microapp
+name: MBSB Local Services
+windows:
+  - active_tab_index: 1
+    tabs:
+      - title: akka services
+        color: Cyan
+        layout:
+          split_direction: horizontal
+          panes:
+            - split_direction: vertical
+              panes:
+                - cwd: /Users/pradeep/source/repos/microsvs-microapp
+                  commands:
+                    - exec: mvn -f backend/statement-service/pom.xml compile exec:java
+                - cwd: /Users/pradeep/source/repos/microsvs-microapp
+                  commands:
+                    - exec: mvn -f backend/product-service/pom.xml compile exec:java
+            - split_direction: vertical
+              panes:
+                - cwd: /Users/pradeep/source/repos/microsvs-microapp
+                  commands:
+                    - exec: mvn -f backend/analysis-service/pom.xml compile exec:java
+                - cwd: /Users/pradeep/source/repos/microsvs-microapp
+                  commands:
+                    - exec: mvn -f backend/recommendation-service/pom.xml compile exec:java
+            - cwd: /Users/pradeep/source/repos/microsvs-microapp
+              commands:
+                - exec: mvn -f platform/platform-service/pom.xml compile exec:java
+      - title: seed + smoke
+        color: Green
+        layout:
+          cwd: /Users/pradeep/source/repos/microsvs-microapp
+          commands:
+            - exec: ./scripts/smoke-local.sh

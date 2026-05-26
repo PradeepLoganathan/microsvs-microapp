@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MBSB NextGen — Demo Console</title>
+<style>
+  :root {
+    --bg: #0e1020; --panel: #181b33; --panel2: #1f2342; --line: #2a2f55;
+    --ink: #eef1ff; --muted: #9aa0c8; --accent: #4f7cff; --accent2: #16c784;
+    --danger: #ea3943; --warn: #ffc107;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 70% -10%, #23284e 0%, var(--bg) 60%);
+    padding: 32px;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: -0.3px; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 16px; }
+  .full { grid-column: 1 / -1; }
+
+  /* service rows */
+  .svc { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .svc:last-child { border-bottom: 0; }
+  .svc .name { font-size: 14px; }
+  .svc .port { color: var(--muted); font-size: 12px; margin-left: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #555; box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+  .dot.up { background: var(--accent2); box-shadow: 0 0 10px rgba(22,199,132,.7); }
+  .dot.down { background: var(--danger); }
+  .state { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+
+  /* buttons */
+  .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--ink);
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 11px 16px; cursor: pointer; transition: .15s; display: inline-flex; align-items: center; gap: 8px;
+  }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); }
+  button.danger:hover { border-color: var(--danger); }
+  button.ghost { background: transparent; }
+
+  /* version toggle */
+  .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+  .seg button { border: 0; background: transparent; border-radius: 8px; padding: 14px 28px; font-size: 16px; color: var(--muted); }
+  .seg button.active { background: var(--accent); color: #fff; }
+  .vmeta { color: var(--muted); font-size: 13px; margin-top: 12px; line-height: 1.5; }
+  .vmeta b { color: var(--ink); }
+
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #000; border: 1px solid var(--line); color: var(--ink);
+    padding: 12px 18px; border-radius: 10px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  a.link { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 14px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>MBSB NextGen</h1><span class="tag">Demo Console</span>
+  </header>
+
+  <div class="grid">
+    <!-- services -->
+    <section class="card">
+      <h2>Services</h2>
+      <div id="services"><div class="svc"><span class="name">loading…</span></div></div>
+    </section>
+
+    <!-- controls -->
+    <section class="card">
+      <h2>Lifecycle</h2>
+      <div class="btns">
+        <button id="startBtn" class="primary" onclick="act('start')">▶ Start everything</button>
+        <button id="stopBtn" class="danger" onclick="act('stop')">■ Stop everything</button>
+        <button id="seedBtn" class="ghost" onclick="act('seed')">↻ Seed / reset data</button>
+      </div>
+      <div class="vmeta">Start launches all 5 services + the UI shell, and seeds (≈1–2 min; first run also installs UI deps). Stop frees all the ports incl. the UI.</div>
+      <div style="margin-top:16px"><a class="link" href="http://localhost:4200" target="_blank" rel="noopener">↗ Open the banking app (:4200)</a></div>
+    </section>
+
+    <!-- version toggle -->
+    <section class="card full">
+      <h2>Statement Analysis micro-app — live version</h2>
+      <div class="seg" id="seg">
+        <button data-v="1.0.0" onclick="setVersion('1.0.0')">v1</button>
+        <button data-v="2.0.0" onclick="setVersion('2.0.0')">v2</button>
+      </div>
+      <div class="vmeta">
+        Current: <b id="curVer">—</b> &nbsp;·&nbsp; v1 = basic category table, v2 = adds Top Merchants + “V2” badge.<br>
+        Flipping this rewrites the micro-frontend manifest — no rebuild, no redeploy. <b>Refresh the phone (⌘⇧R)</b> to see it.
+      </div>
+    </section>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  let busy = false;
+
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  async function refresh() {
+    try {
+      const s = await (await fetch('/api/status')).json();
+      $('#services').innerHTML = s.services.map((x) => `
+        <div class="svc">
+          <span><span class="name">${x.name}</span><span class="port">:${x.port}</span></span>
+          <span class="state"><span class="dot ${x.up ? 'up' : 'down'}"></span>${x.up ? 'up' : 'down'}</span>
+        </div>`).join('');
+      $('#curVer').textContent = s.version || '— (platform not seeded)';
+      document.querySelectorAll('#seg button').forEach((b) =>
+        b.classList.toggle('active', b.dataset.v === s.version));
+    } catch (e) {
+      $('#services').innerHTML = '<div class="svc"><span class="name" style="color:var(--danger)">console helper unreachable</span></div>';
+    }
+  }
+
+  async function act(kind) {
+    if (busy) return; busy = true;
+    const labels = { start: 'Starting services…', stop: 'Stopping services…', seed: 'Seeding…' };
+    toast(labels[kind]);
+    try {
+      const r = await fetch('/api/' + kind, { method: 'POST' });
+      const j = await r.json();
+      if (kind === 'seed') toast('Seed: ' + Object.entries(j).map(([k, v]) => `${k}=${v}`).join('  '));
+      else if (kind === 'start') toast('Start triggered — watch the dots turn green (≈1–2 min).');
+      else toast('Stopped.');
+    } catch (e) { toast('Error: ' + e); }
+    busy = false;
+    refresh();
+  }
+
+  async function setVersion(v) {
+    toast('Switching Statement Analysis → v' + v[0] + ' …');
+    try {
+      const r = await fetch('/api/version', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: v }) });
+      const j = await r.json();
+      if (j.ok) toast('Now v' + v[0] + ' — refresh the phone (⌘⇧R) to see it.');
+      else toast('Could not switch: ' + (j.error || j.status));
+    } catch (e) { toast('Error: ' + e); }
+    refresh();
+  }
+
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+</body>
+</html>
