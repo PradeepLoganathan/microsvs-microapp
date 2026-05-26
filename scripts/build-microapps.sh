@@ -51,6 +51,7 @@ build_microapp "statement-analysis" "v2"
 build_microapp "recommendations"
 build_microapp "advisor"
 build_microapp "onboarding"
+build_microapp "prelogin"
 
 echo ""
 echo -e "${GREEN}All micro-apps built successfully.${NC}"

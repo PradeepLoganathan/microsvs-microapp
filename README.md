@@ -65,6 +65,7 @@ Open `http://localhost:4200` in your browser.
 | product-service | 8085 | Mock product catalog |
 | advisor-service | 8086 | AI wealth advisor — conversational agent (OpenAI) |
 | onboarding-service | 8087 | Resumable CASA + Takaful onboarding workflows |
+| customer-service | 8088 | Customer lifecycle (visitor→registered→customer) + welcome offer |
 | platform-service | 8079 | Micro-frontend manifest + bundle server |
 | mobile banking-shell | 4200 | Ionic Angular host app |
 
@@ -94,6 +95,13 @@ curl -X POST http://localhost:8086/advisor/acc-1001/ask \
 curl -X POST http://localhost:8087/onboarding/casa/app-123/start -H 'Content-Type: application/json' -d '{"customerId":"acc-1001"}'
 curl http://localhost:8087/onboarding/casa/app-123/status   # in-progress; resume by submitting the current step
 curl http://localhost:8087/onboarding/takaful/plans
+
+# Customer lifecycle (visitor → registered → customer) — same id evolves
+curl -X POST http://localhost:8088/customers/visitor-1/visitor -H 'Content-Type: application/json' -d '{"channel":"MOBILE"}'
+curl -X POST http://localhost:8088/customers/visitor-1/register -H 'Content-Type: application/json' -d '{"email":"sara@example.my","phone":"0123456789","channel":"MOBILE"}'
+curl -X POST http://localhost:8088/customers/visitor-1/kyc -H 'Content-Type: application/json' -d '{"idType":"NRIC","idNumber":"900101-01-1234","consent":true}'
+curl http://localhost:8088/customers/visitor-1
+curl http://localhost:8088/customers/prelogin
 
 # Manifest
 curl http://localhost:8079/microfrontends/manifest/demo

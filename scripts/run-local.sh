@@ -30,6 +30,7 @@ SERVICES=(
   "recommendation-service:8084:backend/recommendation-service"
   "advisor-service:8086:backend/advisor-service"
   "onboarding-service:8087:backend/onboarding-service"
+  "customer-service:8088:backend/customer-service"
 )
 
 command -v java >/dev/null 2>&1 || die "java not found (need Java 21)"

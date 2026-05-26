@@ -310,20 +310,6 @@ body {
       inset 0 0 2px 2px rgba(255, 255, 255, 0.05);
   }
 
-  /* Dynamic Island */
-  .device-frame::after {
-    content: "";
-    position: absolute;
-    top: 32px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 128px;
-    height: 35px;
-    background: #0b0b0f;
-    border-radius: 20px;
-    z-index: 20;
-  }
-
   .device-screen {
     border-radius: 48px;
     background: #fff;

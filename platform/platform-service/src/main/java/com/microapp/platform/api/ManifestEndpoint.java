@@ -113,6 +113,13 @@ public class ManifestEndpoint extends AbstractHttpEndpoint {
                 "/bundles/onboarding/1.0.0/main.js",
                 "./Module",
                 "mf-onboarding"
+            ),
+            new ManifestEntry(
+                "prelogin",
+                "1.0.0",
+                "/bundles/prelogin/1.0.0/main.js",
+                "./Module",
+                "mf-prelogin"
             )
         )
     );
