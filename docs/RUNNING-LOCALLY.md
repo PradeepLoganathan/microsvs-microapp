@@ -28,6 +28,29 @@ or when you want each service in its own terminal tab.
 
 ---
 
+## Demo Console (no terminal)
+
+For demos — or if you'd rather not touch the terminal — launch the **Demo Console**:
+
+```bash
+./scripts/demo-console.sh        # opens http://localhost:9700 in your browser
+```
+
+A small local web UI (a dependency-free Node helper) that drives everything from
+the browser:
+
+- **▶ Start everything** — the 5 services **and** the UI shell, then seeds (first run also installs UI deps; ≈1–2 min)
+- **■ Stop everything** — frees all ports, including the UI (`:4200`)
+- **↻ Seed / reset data**
+- **Statement Analysis v1 ⇄ v2** — flip the micro-app version live, then refresh the phone
+- **Live service health** — green/red dots per service
+
+The only terminal command is launching the console; everything else is buttons.
+(Under the hood it shells out to `run-local.sh` / `stop-local.sh`.) All actions
+run server-side in the helper, so there are no CORS issues.
+
+---
+
 ## The pieces
 
 | # | Service | Port | Role | Depends on |
