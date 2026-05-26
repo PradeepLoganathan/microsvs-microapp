@@ -9,7 +9,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="$ROOT_DIR/run"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
-PORTS=(8082 8085 8079 8083 8084 8086 4200)  # 8086 = advisor-service, 4200 = UI shell
+PORTS=(8082 8085 8079 8083 8084 8086 8087 4200)  # 8086 advisor, 8087 onboarding, 4200 UI shell
 
 echo -e "${CYAN}Stopping services...${NC}"
 

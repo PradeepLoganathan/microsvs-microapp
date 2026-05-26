@@ -64,6 +64,7 @@ Open `http://localhost:4200` in your browser.
 | recommendation-service | 8084 | Rules-based product recommendations |
 | product-service | 8085 | Mock product catalog |
 | advisor-service | 8086 | AI wealth advisor — conversational agent (OpenAI) |
+| onboarding-service | 8087 | Resumable CASA + Takaful onboarding workflows |
 | platform-service | 8079 | Micro-frontend manifest + bundle server |
 | mobile banking-shell | 4200 | Ionic Angular host app |
 
@@ -88,6 +89,11 @@ curl "http://localhost:8084/accounts/acc-1001/recommendations?statementId=stmt-2
 curl -X POST http://localhost:8086/advisor/acc-1001/ask \
   -H 'Content-Type: application/json' \
   -d '{"message":"Can I afford to save for a holiday in 2 years?"}'
+
+# Onboarding (resumable CASA + Takaful) — applicationId is yours to choose
+curl -X POST http://localhost:8087/onboarding/casa/app-123/start -H 'Content-Type: application/json' -d '{"customerId":"acc-1001"}'
+curl http://localhost:8087/onboarding/casa/app-123/status   # in-progress; resume by submitting the current step
+curl http://localhost:8087/onboarding/takaful/plans
 
 # Manifest
 curl http://localhost:8079/microfrontends/manifest/demo
