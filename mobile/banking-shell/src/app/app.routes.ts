@@ -33,6 +33,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'onboarding',
+        loadComponent: () =>
+          import('./onboarding/onboarding.component').then(
+            (m) => m.OnboardingComponent
+          ),
+      },
+      {
         path: 'recommendations',
         loadComponent: () =>
           import('./recommendations/recommendations.component').then(

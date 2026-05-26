@@ -61,6 +61,7 @@ run server-side in the helper, so there are no CORS issues.
 | 4 | **analysis-service** | 8083 | Spending analysis (heuristic) | statement-service |
 | 5 | **recommendation-service** | 8084 | Rule-based recommendations | analysis-service |
 | 6 | **advisor-service** | 8086 | AI wealth advisor — conversational agent (OpenAI) | statement + analysis + product |
+| 7 | **onboarding-service** | 8087 | Resumable CASA + Takaful onboarding workflows | — (standalone) |
 | — | **banking-shell** (UI) | 4200 | Ionic/Angular host app | platform-service (+ the above) |
 
 **Why this order:** the chain `statement → analysis → recommendation` is
@@ -95,12 +96,21 @@ mvn -f backend/recommendation-service/pom.xml clean compile exec:java
 #    replies with a graceful "talk to a human advisor" fallback rather than crashing).
 export OPENAI_API_KEY=sk-...
 mvn -f backend/advisor-service/pom.xml clean compile exec:java
+
+# 7. onboarding-service  (:8087)   — resumable CASA + Takaful onboarding (no API key needed)
+mvn -f backend/onboarding-service/pom.xml clean compile exec:java
 ```
 
 The advisor is also the **Advisor** tab in the UI (a chat micro-app, `mf-advisor`).
 Try: *"Can I afford to save for a holiday in 2 years?"* — it grounds the answer in
 the account's real credits/debits, projects affordability, proposes a tabung goal,
 and offers a human handoff.
+
+The **Onboard** tab (micro-app `mf-onboarding`) runs the resumable CASA / Takaful
+journeys: start an application, fill step 1, **close/refresh the app**, reopen → it
+resumes at step 2 (stored via `localStorage`), then completes with an account or a
+takaful policy. Do NOT restart onboarding-service mid-flow when demoing resume — the
+local dev journal is in-memory, so "app close" means the client stops, not the service.
 
 > Tip: `clean` forces a full rebuild. After the first run you can drop it
 > (`mvn -f ... compile exec:java`) for faster restarts.

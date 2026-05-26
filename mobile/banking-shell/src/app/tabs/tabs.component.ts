@@ -16,6 +16,8 @@ import {
   analytics,
   chatbubbleEllipsesOutline,
   chatbubbleEllipses,
+  personAddOutline,
+  personAdd,
   bulbOutline,
   bulb,
 } from 'ionicons/icons';
@@ -45,6 +47,11 @@ import {
         <ion-tab-button tab="advisor">
           <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
           <ion-label>Advisor</ion-label>
+        </ion-tab-button>
+
+        <ion-tab-button tab="onboarding">
+          <ion-icon name="person-add-outline"></ion-icon>
+          <ion-label>Onboard</ion-label>
         </ion-tab-button>
 
         <ion-tab-button tab="recommendations">
@@ -80,6 +87,8 @@ export class TabsComponent {
       analytics,
       chatbubbleEllipsesOutline,
       chatbubbleEllipses,
+      personAddOutline,
+      personAdd,
       bulbOutline,
       bulb,
     });
