@@ -9,7 +9,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="$ROOT_DIR/run"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
-PORTS=(8082 8085 8079 8083 8084)
+PORTS=(8082 8085 8079 8083 8084 4200)  # 4200 = the Angular/Ionic UI shell
 
 echo -e "${CYAN}Stopping services...${NC}"
 
@@ -32,8 +32,9 @@ for p in "${PORTS[@]}"; do
   pids="$(lsof -ti ":$p" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')"
   [ -n "$pids" ] && { kill -9 $pids 2>/dev/null; echo -e "  freed :$p (killed $pids)"; }
 done
-# 3. mop up any lingering maven exec wrappers for these modules
+# 3. mop up any lingering maven exec wrappers and the UI dev server
 pkill -9 -f "akka.javasdk" 2>/dev/null || true
+pkill -9 -f "ng serve" 2>/dev/null || true
 
 sleep 1
 echo -e "${CYAN}Verify:${NC}"
