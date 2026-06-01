@@ -263,6 +263,27 @@ html,
 body {
   height: 100%;
 }
+
+/* ============================================
+   Persona-driven brand colour variables
+   Shell components read these via var(--mbsb-*) so the chrome inside the phone
+   frame shifts when PersonaService sets body[data-persona=...].
+   ============================================ */
+body {
+  --mbsb-toolbar-bg: #1a1a2e;
+  --mbsb-toolbar-fg: #ffffff;
+  --mbsb-tab-active: #0f3460;
+}
+body[data-persona='digital-native'] {
+  --mbsb-toolbar-bg: #6d28d9; /* vibrant purple */
+  --mbsb-toolbar-fg: #ffffff;
+  --mbsb-tab-active: #7c3aed; /* slightly lighter purple */
+}
+body[data-persona='mass-affluent'] {
+  --mbsb-toolbar-bg: #0a2540; /* deep navy */
+  --mbsb-toolbar-fg: #f5deb3; /* cream / gold-ish */
+  --mbsb-tab-active: #b8860b; /* dark gold */
+}
 .device-frame,
 .device-screen {
   display: block;

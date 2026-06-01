@@ -34,8 +34,8 @@ import { MicroAppLoaderComponent } from '../microapp-loader/microapp-loader.comp
   styles: [
     `
       ion-header ion-toolbar {
-        --background: #1a1a2e;
-        --color: #ffffff;
+        --background: var(--mbsb-toolbar-bg, #1a1a2e);
+        --color: var(--mbsb-toolbar-fg, #ffffff);
       }
     `,
   ],
