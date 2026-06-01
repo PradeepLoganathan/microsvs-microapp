@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import akka.javasdk.testkit.TestKitSupport;
+import com.microapp.onboarding.api.OnboardingEndpoint.AccountView;
+import com.microapp.onboarding.api.OnboardingEndpoint.Applications;
 import com.microapp.onboarding.api.OnboardingEndpoint.CasaStatusView;
 import com.microapp.onboarding.api.OnboardingEndpoint.ContributionBody;
 import com.microapp.onboarding.api.OnboardingEndpoint.DetailsBody;
@@ -98,5 +100,64 @@ public class OnboardingEndpointIntegrationTest extends TestKitSupport {
   public void statusBeforeStartIsError() {
     var id = "casa-missing-" + UUID.randomUUID();
     assertThatThrownBy(() -> casaStatus(id));
+  }
+
+  /** A customer with both a CASA and a Takaful in progress should see both surface in /applications. */
+  @Test
+  public void applicationsByCustomerListsCasaAndTakaful() {
+    var customerId = "acc-" + UUID.randomUUID();
+    var casaId = "casa-" + UUID.randomUUID();
+    var takafulId = "takaful-" + UUID.randomUUID();
+
+    httpClient.POST("/onboarding/casa/" + casaId + "/start")
+        .withRequestBody(new StartRequest(customerId))
+        .responseBodyAs(CasaStatusView.class).invoke();
+    httpClient.POST("/onboarding/takaful/" + takafulId + "/start")
+        .withRequestBody(new StartRequest(customerId))
+        .responseBodyAs(TakafulStatusView.class).invoke();
+
+    Awaitility.await().atMost(20, TimeUnit.SECONDS).ignoreExceptions().untilAsserted(() -> {
+      var body = httpClient.GET("/onboarding/customers/" + customerId + "/applications")
+          .responseBodyAs(Applications.class).invoke().body();
+      assertThat(body.applications()).hasSize(2);
+      assertThat(body.applications()).extracting(AccountView::product)
+          .containsExactlyInAnyOrder("CASA", "TAKAFUL");
+      assertThat(body.applications()).extracting(AccountView::applicationId)
+          .containsExactlyInAnyOrder(casaId, takafulId);
+      assertThat(body.applications())
+          .allMatch(a -> a.statusLabel() != null && !a.statusLabel().isBlank());
+    });
+  }
+
+  /** End-to-end: completed CASA shows "Ready to use" + an assigned account number. */
+  @Test
+  public void completedCasaShowsReadyToUse() {
+    var customerId = "acc-" + UUID.randomUUID();
+    var casaId = "casa-" + UUID.randomUUID();
+
+    httpClient.POST("/onboarding/casa/" + casaId + "/start")
+        .withRequestBody(new StartRequest(customerId))
+        .responseBodyAs(CasaStatusView.class).invoke();
+    awaitCasaStage(casaId, "AWAITING_DETAILS");
+    httpClient.POST("/onboarding/casa/" + casaId + "/submit")
+        .withRequestBody(new SubmitCasaRequest(
+            new DetailsBody("Sara Aziz", "sara@example.my", "0123456789", "SAVINGS"), null))
+        .responseBodyAs(CasaStatusView.class).invoke();
+    awaitCasaStage(casaId, "AWAITING_EKYC_CONSENT");
+    httpClient.POST("/onboarding/casa/" + casaId + "/submit")
+        .withRequestBody(new SubmitCasaRequest(null, new EkycBody("NRIC", "900101-01-1234", true)))
+        .responseBodyAs(CasaStatusView.class).invoke();
+    awaitCasaStage(casaId, "COMPLETED");
+
+    Awaitility.await().atMost(20, TimeUnit.SECONDS).ignoreExceptions().untilAsserted(() -> {
+      var body = httpClient.GET("/onboarding/customers/" + customerId + "/applications")
+          .responseBodyAs(Applications.class).invoke().body();
+      var casa = body.applications().stream()
+          .filter(a -> a.applicationId().equals(casaId)).findFirst().orElseThrow();
+      assertThat(casa.product()).isEqualTo("CASA");
+      assertThat(casa.statusLabel()).isEqualTo("Ready to use");
+      assertThat(casa.accountNumber()).startsWith("CASA-");
+      assertThat(casa.productName()).contains("SAVINGS");
+    });
   }
 }

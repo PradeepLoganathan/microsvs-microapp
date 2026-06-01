@@ -47,6 +47,19 @@ interface Nba {
 
 interface NbaResponse { matched: boolean; offer: Nba | null; }
 
+interface Application {
+  applicationId: string;
+  product: 'CASA' | 'TAKAFUL';
+  productName: string;
+  stage: string;
+  statusLabel: string;
+  accountNumber: string;
+  summary: string;
+  updatedAt: number;
+}
+
+interface Applications { applications: Application[]; }
+
 interface NewGoalForm {
   name: string;
   category: string;
@@ -76,6 +89,23 @@ const TRAVEL_HINTS = ['air', 'airlines', 'airways', 'flight', 'hotel', 'agoda', 
           </div>
         </div>
       </header>
+
+      <section *ngIf="accounts.length > 0" class="accounts">
+        <div class="section-header">
+          <h2>Your accounts</h2>
+        </div>
+        <div *ngFor="let a of accounts" class="account-card" [class.account-takaful]="a.product === 'TAKAFUL'">
+          <div class="account-icon">{{ a.product === 'CASA' ? '\uD83C\uDFE6' : '\uD83D\uDEE1\uFE0F' }}</div>
+          <div class="account-main">
+            <div class="account-name">{{ a.productName }}</div>
+            <div class="account-meta">{{ a.accountNumber ? a.accountNumber : 'Pending' }}</div>
+            <div class="account-summary">{{ a.summary }}</div>
+          </div>
+          <div class="account-status-pill" [class]="'pill-' + statusTier(a.statusLabel)">
+            {{ a.statusLabel }}
+          </div>
+        </div>
+      </section>
 
       <div #nbaSlot>
         <section *ngIf="nbaResponse?.matched && nbaResponse?.offer && !nbaDismissed"
@@ -187,6 +217,26 @@ const TRAVEL_HINTS = ['air', 'airlines', 'airways', 'flight', 'hotel', 'agoda', 
     .month-card.credits .month-amount { color: #b6f0c5; }
     .month-card.debits .month-amount { color: #ffd6c7; }
 
+    .accounts { margin-bottom: 16px; }
+    .account-card { display: grid; grid-template-columns: auto 1fr auto; column-gap: 12px;
+                    background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #2456b5; }
+    .account-card.account-takaful { border-left-color: #1f7a45; }
+    .account-icon { width: 38px; height: 38px; border-radius: 10px; background: #eaf1ff;
+                    display: flex; align-items: center; justify-content: center; font-size: 18px;
+                    align-self: center; }
+    .account-card.account-takaful .account-icon { background: #e6f6ec; }
+    .account-main { min-width: 0; align-self: center; }
+    .account-name { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+    .account-meta { font-size: 12px; color: #7e7e8a; font-variant-numeric: tabular-nums;
+                    margin-top: 2px; letter-spacing: 0.3px; }
+    .account-summary { font-size: 12px; color: #4a4a55; margin-top: 4px; }
+    .account-status-pill { font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
+                           letter-spacing: 0.4px; align-self: center; white-space: nowrap; }
+    .pill-active { background: #e6f6ec; color: #1f7a45; }
+    .pill-pending { background: #fff4d6; color: #8a6700; }
+    .pill-failed { background: #fdecea; color: #c0392b; }
+
     .nba-card { background: #fff8e6; border: 1px solid #f6d57b; border-left: 4px solid #f1a800;
                 border-radius: 12px; padding: 16px 18px; margin-bottom: 16px;
                 transition: transform 0.2s ease, box-shadow 0.2s ease; }
@@ -273,6 +323,7 @@ export class AppComponent implements OnInit {
   @ViewChild('nbaSlot', { static: false }) nbaSlot?: ElementRef<HTMLElement>;
 
   goals: Goal[] = [];
+  accounts: Application[] = [];
   statement: Statement | null = null;
   largeTxns: Transaction[] = [];
   nbaResponse: NbaResponse | null = null;
@@ -295,6 +346,22 @@ export class AppComponent implements OnInit {
   loadAll(): void {
     this.loadGoals();
     this.loadStatement();
+    this.loadAccounts();
+  }
+
+  private loadAccounts(): void {
+    this.http.get<Applications>(
+      `${environment.onboardingApiUrl}/onboarding/customers/${this.customerId}/applications`)
+      .subscribe({
+        next: (data) => { this.accounts = data.applications || []; },
+        error: (err) => { console.warn('Failed to load accounts', err); },
+      });
+  }
+
+  statusTier(label: string): 'active' | 'pending' | 'failed' {
+    if (label === 'Ready to use' || label === 'Active') return 'active';
+    if (label === 'Application failed') return 'failed';
+    return 'pending';
   }
 
   private loadGoals(): void {

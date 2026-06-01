@@ -9,13 +9,19 @@ import akka.javasdk.http.AbstractHttpEndpoint;
 import com.microapp.onboarding.application.CasaOnboardingWorkflow;
 import com.microapp.onboarding.application.CasaOnboardingWorkflow.StartCasa;
 import com.microapp.onboarding.application.CasaOnboardingWorkflow.SubmitCasaStep;
+import com.microapp.onboarding.application.CasaOnboardingsByCustomerView;
+import com.microapp.onboarding.application.CasaOnboardingsByCustomerView.CasaRow;
 import com.microapp.onboarding.application.TakafulOnboardingWorkflow;
 import com.microapp.onboarding.application.TakafulOnboardingWorkflow.StartTakaful;
 import com.microapp.onboarding.application.TakafulOnboardingWorkflow.SubmitTakafulStep;
+import com.microapp.onboarding.application.TakafulOnboardingsByCustomerView;
+import com.microapp.onboarding.application.TakafulOnboardingsByCustomerView.TakafulRow;
 import com.microapp.onboarding.domain.CasaOnboarding;
 import com.microapp.onboarding.domain.TakafulOnboarding;
 import com.microapp.onboarding.domain.TakafulOnboarding.PlanContribution;
 import com.microapp.onboarding.domain.TakafulPlanCatalog;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -56,6 +62,19 @@ public class OnboardingEndpoint extends AbstractHttpEndpoint {
       String policyNumber, String effectiveDate, String certificateSummary, String failureReason) {}
 
   public record PlanView(String id, String name, String description, double minMonthlyContribution) {}
+
+  /** Unified shape across CASA + Takaful for the home page's "Your accounts" card. */
+  public record AccountView(
+      String applicationId,
+      String product,        // "CASA" or "TAKAFUL"
+      String productName,    // friendly label, e.g. "Savings Account" or "Family Takaful"
+      String stage,          // raw workflow stage
+      String statusLabel,    // human-friendly status ("Pending eKYC", "Ready to use", ...)
+      String accountNumber,  // accountId for CASA, policyNumber for Takaful; "" if not yet assigned
+      String summary,        // "RM 0 opening balance" / "RM 150 / MONTHLY" / "Awaiting plan"
+      long updatedAt) {}
+
+  public record Applications(List<AccountView> applications) {}
 
   // ---- CASA ----
 
@@ -120,5 +139,81 @@ public class OnboardingEndpoint extends AbstractHttpEndpoint {
     return TakafulPlanCatalog.PLANS.stream()
         .map(p -> new PlanView(p.id(), p.name(), p.description(), p.minMonthlyContribution()))
         .toList();
+  }
+
+  // ---- Combined: accounts owned by a customer (CASA + Takaful, newest first) ----
+
+  @Get("/customers/{customerId}/applications")
+  public Applications applicationsByCustomer(String customerId) {
+    var casa = componentClient.forView()
+        .method(CasaOnboardingsByCustomerView::byCustomer)
+        .invoke(customerId)
+        .casaApplications();
+    var takaful = componentClient.forView()
+        .method(TakafulOnboardingsByCustomerView::byCustomer)
+        .invoke(customerId)
+        .takafulApplications();
+
+    var combined = new ArrayList<AccountView>();
+    for (var r : casa) combined.add(toAccountView(r));
+    for (var r : takaful) combined.add(toAccountView(r));
+    combined.sort(Comparator.comparingLong(AccountView::updatedAt).reversed());
+    return new Applications(combined);
+  }
+
+  private static AccountView toAccountView(CasaRow r) {
+    var productName = r.accountType().isBlank() ? "CASA Account" : r.accountType() + " Account";
+    return new AccountView(
+        r.applicationId(),
+        "CASA",
+        productName,
+        r.stage(),
+        casaStatusLabel(r.stage()),
+        r.accountId(),
+        "RM 0 opening balance",
+        r.updatedAt());
+  }
+
+  private static AccountView toAccountView(TakafulRow r) {
+    var productName = TakafulPlanCatalog.PLANS.stream()
+        .filter(p -> p.id().equals(r.selectedPlanId()))
+        .findFirst()
+        .map(p -> p.name())
+        .orElse("Family Takaful");
+    var summary = r.contributionAmount() > 0
+        ? String.format("RM %.0f / %s", r.contributionAmount(),
+            r.contributionFrequency().isBlank() ? "month" : r.contributionFrequency().toLowerCase())
+        : "Awaiting plan & contribution";
+    return new AccountView(
+        r.applicationId(),
+        "TAKAFUL",
+        productName,
+        r.stage(),
+        takafulStatusLabel(r.stage()),
+        r.policyNumber(),
+        summary,
+        r.updatedAt());
+  }
+
+  private static String casaStatusLabel(String stage) {
+    return switch (stage) {
+      case "STARTED", "AWAITING_DETAILS" -> "Pending your details";
+      case "AWAITING_EKYC_CONSENT" -> "Pending eKYC";
+      case "RUNNING_EKYC", "CREATING_ACCOUNT", "WELCOME" -> "Setting up";
+      case "COMPLETED" -> "Ready to use";
+      case "FAILED" -> "Application failed";
+      default -> stage;
+    };
+  }
+
+  private static String takafulStatusLabel(String stage) {
+    return switch (stage) {
+      case "STARTED", "AWAITING_PLAN_SELECTION" -> "Choose a plan";
+      case "AWAITING_CONTRIBUTION" -> "Set contribution";
+      case "CHECKING_ELIGIBILITY", "ACTIVATING_POLICY", "ISSUING_CERTIFICATE" -> "Setting up";
+      case "COMPLETED" -> "Active";
+      case "FAILED" -> "Application failed";
+      default -> stage;
+    };
   }
 }

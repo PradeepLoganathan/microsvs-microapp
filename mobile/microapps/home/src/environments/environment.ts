@@ -3,6 +3,7 @@ export const environment = {
   statementApiUrl: 'http://localhost:8082',
   goalsApiUrl: 'http://localhost:8089',
   recommendationApiUrl: 'http://localhost:8084',
+  onboardingApiUrl: 'http://localhost:8087',
   accountId: 'acc-1001',
   statementId: 'stmt-2025-12',
 };
