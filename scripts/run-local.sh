@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run-local.sh — start all 5 Akka services locally in the background, then
+# run-local.sh — start all 9 Akka services locally in the background, then
 # seed + verify (via smoke-local.sh). One command, one terminal tab.
 #
 #   ./scripts/run-local.sh            # compile + run (fast; reuses prior build)
@@ -31,6 +31,7 @@ SERVICES=(
   "advisor-service:8086:backend/advisor-service"
   "onboarding-service:8087:backend/onboarding-service"
   "customer-service:8088:backend/customer-service"
+  "goals-service:8089:backend/goals-service"
 )
 
 command -v java >/dev/null 2>&1 || die "java not found (need Java 21)"
