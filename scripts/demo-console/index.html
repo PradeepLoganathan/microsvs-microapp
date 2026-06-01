@@ -103,19 +103,34 @@
         <button id="seedBtn" class="ghost" onclick="act('seed')">↻ Seed / reset data</button>
       </div>
       <div class="vmeta">Start launches all services + the UI shell, and seeds (≈1–2 min; first run also installs UI deps). Watch the progress bar above. Stop frees all the ports incl. the UI.</div>
-      <div style="margin-top:16px"><a class="link" href="http://localhost:4200" target="_blank" rel="noopener">↗ Open the banking app (:4200)</a></div>
+    </section>
+
+    <!-- persona toggle -->
+    <section class="card full">
+      <h2>Customer persona — drives the whole manifest</h2>
+      <div class="seg" id="personaSeg">
+        <button data-p="default" onclick="setPersona('default')">Existing</button>
+        <button data-p="digital-native" onclick="setPersona('digital-native')">Digital Native</button>
+        <button data-p="mass-affluent" onclick="setPersona('mass-affluent')">Mass Affluent</button>
+      </div>
+      <div class="vmeta">
+        Active: <b id="curPersona">Existing</b> &nbsp;·&nbsp;
+        the shell fetches a different manifest channel per persona (<i>demo</i> / <i>demo-digital-native</i> / <i>demo-mass-affluent</i>) — Mass Affluent ships statement-analysis v2 with Top Merchants visible by default.<br>
+        Pick a persona, then open the banking app below (or hard-refresh ⌘⇧R if it's already open).
+      </div>
+      <div style="margin-top:16px"><a class="link" id="appLink" href="http://localhost:4200" target="mbsb-banking-app" rel="noopener" onclick="openApp(event)">↗ Open / refresh the banking app (:4200)</a></div>
     </section>
 
     <!-- version toggle -->
     <section class="card full">
-      <h2>Statement Analysis micro-app — live version</h2>
+      <h2>Statement Analysis micro-app — live version (active persona's channel)</h2>
       <div class="seg" id="seg">
         <button data-v="1.0.0" onclick="setVersion('1.0.0')">v1</button>
         <button data-v="2.0.0" onclick="setVersion('2.0.0')">v2</button>
       </div>
       <div class="vmeta">
         Current: <b id="curVer">—</b> &nbsp;·&nbsp; v1 = basic category table, v2 = adds Top Merchants + “V2” badge.<br>
-        Flipping this rewrites the micro-frontend manifest — no rebuild, no redeploy. <b>Refresh the phone (⌘⇧R)</b> to see it.
+        Flipping this rewrites the manifest of whichever persona channel is active right now (shown above). <b>Refresh the phone (⌘⇧R)</b> to see it.
       </div>
     </section>
   </div>
@@ -159,7 +174,8 @@
 
   async function refresh() {
     try {
-      const s = await (await fetch('/api/status')).json();
+      const p = currentPersona();
+      const s = await (await fetch('/api/status?persona=' + encodeURIComponent(p))).json();
       const svcs = s.services;
       const up = svcs.filter((x) => x.up).length;
       const total = svcs.length;
@@ -224,17 +240,57 @@
     refresh();
   }
 
+  const PERSONA_KEY = 'mbsb-console-persona';
+  const PERSONA_LABEL = { 'default': 'Existing', 'digital-native': 'Digital Native', 'mass-affluent': 'Mass Affluent' };
+
+  function currentPersona() { return localStorage.getItem(PERSONA_KEY) || 'default'; }
+
+  function appUrlFor(p) {
+    return p === 'default' ? 'http://localhost:4200/' : 'http://localhost:4200/?persona=' + p;
+  }
+
+  function applyPersonaUI() {
+    const p = currentPersona();
+    document.querySelectorAll('#personaSeg button').forEach((b) =>
+        b.classList.toggle('active', b.dataset.p === p));
+    $('#curPersona').textContent = PERSONA_LABEL[p] || p;
+    $('#appLink').href = appUrlFor(p);
+  }
+
+  // Reuses a named window so an already-open banking app tab reloads with the new
+  // URL (and therefore the new persona) instead of spawning a fresh tab each time.
+  function openApp(ev) {
+    if (ev) ev.preventDefault();
+    window.open(appUrlFor(currentPersona()), 'mbsb-banking-app');
+  }
+
+  function setPersona(p) {
+    if (p === 'default') localStorage.removeItem(PERSONA_KEY);
+    else localStorage.setItem(PERSONA_KEY, p);
+    applyPersonaUI();
+    // Cross-origin localStorage doesn't sync, so we drive the banking-app tab by
+    // opening (or re-navigating) it to a URL with the chosen persona param.
+    window.open(appUrlFor(p), 'mbsb-banking-app');
+    toast('Persona → ' + (PERSONA_LABEL[p] || p) + '  ·  banking app reloading.');
+  }
+
   async function setVersion(v) {
-    toast('Switching Statement Analysis → v' + v[0] + ' …');
+    const p = currentPersona();
+    toast('Switching Statement Analysis → v' + v[0] + ' on ' + (PERSONA_LABEL[p] || p) + ' …');
     try {
-      const r = await fetch('/api/version', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: v }) });
+      const r = await fetch('/api/version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: v, persona: p }),
+      });
       const j = await r.json();
-      if (j.ok) toast('Now v' + v[0] + ' — refresh the phone (⌘⇧R) to see it.');
+      if (j.ok) toast('Now v' + v[0] + ' on channel ' + j.channel + ' — refresh the phone (⌘⇧R) to see it.');
       else toast('Could not switch: ' + (j.error || j.status));
     } catch (e) { toast('Error: ' + e); }
     refresh();
   }
 
+  applyPersonaUI();
   refresh();
   setInterval(refresh, 2000);
 </script>

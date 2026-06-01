@@ -63,7 +63,7 @@ function request(method, url, body) {
   });
 }
 
-async function getStatus() {
+async function getStatus(personaParam) {
   const services = [];
   for (const s of SERVICES) {
     const r = await request('GET', `http://localhost:${s.port}/`); // any response = up
@@ -72,28 +72,38 @@ async function getStatus() {
   const shell = await request('GET', `http://localhost:${SHELL_PORT}/`);
   services.push({ name: 'banking-shell (UI)', port: SHELL_PORT, up: shell.ok });
 
+  // Look up the statement-analysis version on the channel the console currently
+  // tracks (i.e. the active persona) so the v1/v2 segment reflects what that
+  // persona is actually serving.
+  const channel = channelFor(personaParam);
   let version = null;
-  const m = await request('GET', `${PLATFORM}/microfrontends/manifest/${CHANNEL}`);
+  const m = await request('GET', `${PLATFORM}/microfrontends/manifest/${channel}`);
   if (m.ok && m.status === 200) {
     try {
       const sa = (JSON.parse(m.body).microfrontends || []).find((x) => x.name === 'statement-analysis');
       if (sa) version = sa.version;
     } catch (_) {}
   }
-  return { services, version };
+  return { services, version, channel };
 }
 
-async function setVersion(version) {
-  const m = await request('GET', `${PLATFORM}/microfrontends/manifest/${CHANNEL}`);
-  if (!m.ok || m.status !== 200) return { ok: false, error: 'platform-service unreachable or manifest not seeded' };
+function channelFor(persona) {
+  if (!persona || persona === 'default') return CHANNEL;
+  return `${CHANNEL}-${persona}`;
+}
+
+async function setVersion(version, persona) {
+  const channel = channelFor(persona);
+  const m = await request('GET', `${PLATFORM}/microfrontends/manifest/${channel}`);
+  if (!m.ok || m.status !== 200) return { ok: false, error: `platform-service unreachable or manifest not seeded for ${channel}` };
   let manifest;
   try { manifest = JSON.parse(m.body); } catch (_) { return { ok: false, error: 'manifest is not valid JSON' }; }
   const sa = (manifest.microfrontends || []).find((x) => x.name === 'statement-analysis');
   if (!sa) return { ok: false, error: 'statement-analysis not in manifest' };
   sa.version = version;
   sa.remoteEntry = `/bundles/statement-analysis/${version}/main.js`;
-  const put = await request('PUT', `${PLATFORM}/microfrontends/manifest/${CHANNEL}`, manifest);
-  return { ok: put.ok && put.status >= 200 && put.status < 300, status: put.status, version };
+  const put = await request('PUT', `${PLATFORM}/microfrontends/manifest/${channel}`, manifest);
+  return { ok: put.ok && put.status >= 200 && put.status < 300, status: put.status, version, channel };
 }
 
 async function seed() {
@@ -150,15 +160,17 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(data);
     }
-    if (u.pathname === '/api/status' && req.method === 'GET') return send(res, 200, await getStatus());
+    if (u.pathname === '/api/status' && req.method === 'GET') {
+      return send(res, 200, await getStatus(u.searchParams.get('persona')));
+    }
     if (u.pathname === '/api/seed' && req.method === 'POST') return send(res, 200, await seed());
     if (u.pathname === '/api/start' && req.method === 'POST') return send(res, 202, { backend: startServices(), ui: startShell() });
     if (u.pathname === '/api/stop' && req.method === 'POST') return send(res, 200, await stopServices());
     if (u.pathname === '/api/version' && req.method === 'POST') {
-      let v = null;
-      try { v = JSON.parse(await readBody(req)).version; } catch (_) {}
+      let v = null, persona = null;
+      try { const b = JSON.parse(await readBody(req)); v = b.version; persona = b.persona; } catch (_) {}
       if (v !== '1.0.0' && v !== '2.0.0') return send(res, 400, { ok: false, error: 'version must be "1.0.0" or "2.0.0"' });
-      return send(res, 200, await setVersion(v));
+      return send(res, 200, await setVersion(v, persona));
     }
     send(res, 404, { error: 'not found' });
   } catch (e) {

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { PersonaService } from './persona.service';
 
 /**
  * Represents a single micro-frontend entry from the registry manifest.
@@ -33,9 +34,6 @@ interface ScriptLoadState {
   error: string | null;
 }
 
-const MANIFEST_URL =
-  `${environment.platformBaseUrl}/microfrontends/manifest/${environment.manifestChannel}`;
-
 @Injectable({
   providedIn: 'root',
 })
@@ -44,7 +42,11 @@ export class MicroAppService {
   private manifestLoading: Promise<MicroAppManifest> | null = null;
   private scriptStates = new Map<string, ScriptLoadState>();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private personaService: PersonaService) {}
+
+  private manifestUrl(): string {
+    return `${environment.platformBaseUrl}/microfrontends/manifest/${this.personaService.channel()}`;
+  }
 
   /**
    * Fetches the micro-frontend manifest from the registry.
@@ -213,18 +215,21 @@ export class MicroAppService {
    * Internal: performs the actual HTTP fetch of the manifest.
    */
   private async loadManifest(): Promise<MicroAppManifest> {
+    const url = this.manifestUrl();
     try {
       const response = await firstValueFrom(
-        this.http.get<MicroAppManifest>(MANIFEST_URL)
+        this.http.get<MicroAppManifest>(url)
       );
       console.log(
-        '[MicroAppService] Manifest loaded:',
+        '[MicroAppService] Manifest loaded from',
+        url,
+        '-',
         response.microfrontends.length,
         'entries'
       );
       return response;
     } catch (err) {
-      console.error('[MicroAppService] Failed to fetch manifest:', err);
+      console.error('[MicroAppService] Failed to fetch manifest from', url, ':', err);
       throw new Error(
         'Unable to load micro-frontend manifest. Please check your connection.'
       );

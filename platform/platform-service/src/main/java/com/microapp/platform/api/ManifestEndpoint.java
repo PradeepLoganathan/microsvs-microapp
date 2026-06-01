@@ -68,75 +68,53 @@ public class ManifestEndpoint extends AbstractHttpEndpoint {
   }
 
   /**
-   * Seeds the default manifest with all micro-apps pointing to the bundle endpoint.
-   * Bundle URLs use a relative path so they work on any deployed hostname.
+   * Seeds the default manifest plus per-persona variants. Bundle URLs are relative
+   * so they work on any deployed hostname. ManifestEntity.create is idempotent —
+   * re-seeding skips channels that already exist.
+   *
+   * Channels seeded:
+   *   demo                    — baseline / existing customer migrating to digital
+   *   demo-digital-native     — young mobile-first persona (currently same as demo;
+   *                             reserved for future persona-specific variants)
+   *   demo-mass-affluent      — wealth-focused persona; pinned to statement-analysis v2
+   *                             so Top Merchants is visible on the Analysis tab
    */
   @Post("/seed")
   public HttpResponse seed() {
-    logger.info("Seeding default manifest...");
+    logger.info("Seeding manifests (3 channels: demo, demo-digital-native, demo-mass-affluent)...");
 
-    Manifest manifest = new Manifest(
+    seedChannel(DEFAULT_CHANNEL, "1.0.0");
+    seedChannel("demo-digital-native", "1.0.0");
+    seedChannel("demo-mass-affluent", "2.0.0");
+
+    logger.info("Manifest seeding complete");
+    return HttpResponses.ok();
+  }
+
+  private void seedChannel(String channel, String statementAnalysisVersion) {
+    var manifest = new Manifest(
         "2026-02-20T00:00:00Z",
-        DEFAULT_CHANNEL,
+        channel,
         List.of(
-            new ManifestEntry(
-                "home",
-                "1.0.0",
-                "/bundles/home/1.0.0/main.js",
-                "./Module",
-                "mf-home"
-            ),
-            new ManifestEntry(
-                "statement-details",
-                "1.0.0",
-                "/bundles/statement-details/1.0.0/main.js",
-                "./Module",
-                "mf-statement-details"
-            ),
-            new ManifestEntry(
-                "statement-analysis",
-                "1.0.0",
-                "/bundles/statement-analysis/1.0.0/main.js",
-                "./Module",
-                "mf-statement-analysis"
-            ),
-            new ManifestEntry(
-                "recommendations",
-                "1.0.0",
-                "/bundles/recommendations/1.0.0/main.js",
-                "./Module",
-                "mf-recommendations"
-            ),
-            new ManifestEntry(
-                "advisor",
-                "1.0.0",
-                "/bundles/advisor/1.0.0/main.js",
-                "./Module",
-                "mf-advisor"
-            ),
-            new ManifestEntry(
-                "onboarding",
-                "1.0.0",
-                "/bundles/onboarding/1.0.0/main.js",
-                "./Module",
-                "mf-onboarding"
-            ),
-            new ManifestEntry(
-                "prelogin",
-                "1.0.0",
-                "/bundles/prelogin/1.0.0/main.js",
-                "./Module",
-                "mf-prelogin"
-            )
-        )
-    );
+            new ManifestEntry("home", "1.0.0",
+                "/bundles/home/1.0.0/main.js", "./Module", "mf-home"),
+            new ManifestEntry("statement-details", "1.0.0",
+                "/bundles/statement-details/1.0.0/main.js", "./Module", "mf-statement-details"),
+            new ManifestEntry("statement-analysis", statementAnalysisVersion,
+                "/bundles/statement-analysis/" + statementAnalysisVersion + "/main.js",
+                "./Module", "mf-statement-analysis"),
+            new ManifestEntry("recommendations", "1.0.0",
+                "/bundles/recommendations/1.0.0/main.js", "./Module", "mf-recommendations"),
+            new ManifestEntry("advisor", "1.0.0",
+                "/bundles/advisor/1.0.0/main.js", "./Module", "mf-advisor"),
+            new ManifestEntry("onboarding", "1.0.0",
+                "/bundles/onboarding/1.0.0/main.js", "./Module", "mf-onboarding"),
+            new ManifestEntry("prelogin", "1.0.0",
+                "/bundles/prelogin/1.0.0/main.js", "./Module", "mf-prelogin")));
 
     componentClient
-        .forEventSourcedEntity(DEFAULT_CHANNEL)
+        .forEventSourcedEntity(channel)
         .method(ManifestEntity::create)
         .invoke(manifest);
-
-    logger.info("Default manifest seeded successfully");
-    return HttpResponses.ok();
   }
 }
