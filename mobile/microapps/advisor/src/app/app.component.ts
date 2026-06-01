@@ -1,30 +1,26 @@
-import { Component } from '@angular/core';
+import { Component, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 
-interface Proposal {
-  actionType: string;
-  title: string;
-  description: string;
-  targetAmount: number;
-  monthlyContribution: number;
-  productId: string;
-  rationale: string;
+interface ActionView {
+  type: 'CASA' | 'TAKAFUL' | 'TABUNG' | 'ADVISOR_HUMAN';
+  label: string;
+  params: Record<string, string>;
 }
 
 interface AskResponse {
-  reply: string;
-  proposal: Proposal | null;
-  humanHandoffOffered: boolean;
+  message: string;
+  action: ActionView | null;
+  needsHuman: boolean;
 }
 
 interface ChatMessage {
   role: 'user' | 'advisor';
   text: string;
-  proposal?: Proposal | null;
-  handoff?: boolean;
+  action?: ActionView | null;
+  needsHuman?: boolean;
 }
 
 @Component({
@@ -37,7 +33,7 @@ interface ChatMessage {
         <div class="avatar">K</div>
         <div>
           <div class="name">K — Wealth Advisor</div>
-          <div class="status">Shariah-aware · grounded in your accounts</div>
+          <div class="status">Be Bold. Bank Smart.</div>
         </div>
       </div>
 
@@ -45,23 +41,18 @@ interface ChatMessage {
         <div *ngFor="let m of messages" class="row" [class.user]="m.role === 'user'">
           <div class="bubble" [class.user]="m.role === 'user'">{{ m.text }}</div>
 
-          <div *ngIf="m.proposal && m.proposal.actionType !== 'NONE'" class="proposal">
-            <div class="p-badge">Proposed action</div>
-            <div class="p-title">{{ m.proposal.title }}</div>
-            <div class="p-desc">{{ m.proposal.description }}</div>
-            <div class="p-figs" *ngIf="m.proposal.targetAmount > 0">
-              <div class="fig">
-                <span class="lbl">Target</span><span class="val">RM {{ fmt(m.proposal.targetAmount) }}</span>
-              </div>
-              <div class="fig">
-                <span class="lbl">Monthly</span><span class="val">RM {{ fmt(m.proposal.monthlyContribution) }}</span>
-              </div>
-            </div>
-            <div class="p-rationale" *ngIf="m.proposal.rationale">{{ m.proposal.rationale }}</div>
-          </div>
+          <button
+            *ngIf="m.action"
+            class="action"
+            [class.action-handoff]="m.action.type === 'ADVISOR_HUMAN'"
+            (click)="onActionClick(m.action)"
+          >
+            {{ actionIcon(m.action.type) }} {{ m.action.label }}
+            <span class="action-chev">›</span>
+          </button>
 
-          <div *ngIf="m.handoff" class="handoff">
-            🤝 A licensed advisor can set this up — <button class="link" (click)="ask('Yes, please connect me with an advisor.')">talk to a human</button>
+          <div *ngIf="m.needsHuman && !m.action" class="handoff">
+            🤝 A licensed advisor will follow up about this.
           </div>
         </div>
 
@@ -101,18 +92,22 @@ interface ChatMessage {
     .bubble { max-width: 82%; padding: 11px 14px; border-radius: 16px; font-size: 14px; line-height: 1.45; background: #fff; color: #222; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.08); white-space: pre-wrap; }
     .bubble.user { background: #0f3460; color: #fff; border-radius: 16px; border-bottom-right-radius: 4px; }
 
-    .proposal { margin-top: 8px; max-width: 88%; background: #fff; border: 1px solid #e6e8ef; border-left: 4px solid #e94560; border-radius: 12px; padding: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
-    .p-badge { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #e94560; font-weight: 700; margin-bottom: 6px; }
-    .p-title { font-size: 15px; font-weight: 700; color: #1a1a2e; }
-    .p-desc { font-size: 13px; color: #555; margin-top: 2px; line-height: 1.45; }
-    .p-figs { display: flex; gap: 10px; margin-top: 12px; }
-    .fig { flex: 1; background: #f7f8fc; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
-    .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #8a90a6; }
-    .val { font-size: 15px; font-weight: 700; color: #0f3460; margin-top: 2px; }
-    .p-rationale { font-size: 12px; color: #7f8c8d; margin-top: 10px; font-style: italic; }
+    .action {
+      margin-top: 8px;
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #fff; border: 1px solid #d8dce8; border-left: 4px solid #e94560;
+      color: #1a1a2e; font-size: 13.5px; font-weight: 600;
+      padding: 10px 14px; border-radius: 12px;
+      cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      align-self: flex-start;
+    }
+    .action:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.08); border-color: #0f3460; }
+    .action:active { transform: translateY(0); }
+    .action-chev { margin-left: auto; color: #8a90a6; font-size: 18px; line-height: 1; }
+    .action-handoff { border-left-color: #f1a800; }
 
-    .handoff { margin-top: 8px; font-size: 12.5px; color: #555; background: #fff; border: 1px dashed #cdd2e0; border-radius: 10px; padding: 8px 12px; }
-    .link { background: none; border: none; color: #e94560; font-weight: 600; cursor: pointer; padding: 0; font-size: 12.5px; }
+    .handoff { margin-top: 8px; font-size: 12.5px; color: #555; background: #fff; border: 1px dashed #cdd2e0; border-radius: 10px; padding: 8px 12px; align-self: flex-start; }
 
     .typing { display: inline-flex; gap: 4px; align-items: center; }
     .typing span { width: 7px; height: 7px; border-radius: 50%; background: #b6bccf; animation: blink 1.2s infinite both; }
@@ -138,18 +133,18 @@ export class AppComponent {
   messages: ChatMessage[] = [
     {
       role: 'advisor',
-      text: "As-salamu alaykum 👋 I'm K, your wealth advisor. Ask me about saving, budgeting, or planning a goal — I'll use your real account data.",
+      text: "Hi 👋 I'm K, your wealth advisor. Ask me about saving, budgeting, or planning a goal — I'll use your real account data.",
     },
   ];
   input = '';
   loading = false;
   suggestions = [
-    'Can I afford to save for Hajj in 2 years?',
+    'Can I afford to save for a holiday in 2 years?',
     "How's my spending looking?",
-    'Help me start a savings goal',
+    'Help me start an emergency fund',
   ];
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private elementRef: ElementRef) {}
 
   ask(text: string): void {
     this.input = text;
@@ -168,9 +163,9 @@ export class AppComponent {
       next: (res) => {
         this.messages.push({
           role: 'advisor',
-          text: res.reply,
-          proposal: res.proposal,
-          handoff: res.humanHandoffOffered,
+          text: res.message,
+          action: res.action,
+          needsHuman: res.needsHuman,
         });
         this.loading = false;
         this.scrollSoon();
@@ -187,15 +182,34 @@ export class AppComponent {
     this.scrollSoon();
   }
 
+  /**
+   * Translate the agent's structured action into a custom event that bubbles
+   * out of the Shadow DOM. The shell listens for `mbsb-navigate` and decides
+   * which tab to navigate to + which params to pre-fill. The micro-app owns
+   * the action label; the shell owns the navigation surface — clean separation.
+   */
+  onActionClick(action: ActionView): void {
+    const detail = { type: action.type, params: action.params || {} };
+    this.elementRef.nativeElement.dispatchEvent(
+      new CustomEvent('mbsb-navigate', { detail, bubbles: true, composed: true })
+    );
+  }
+
+  actionIcon(type: ActionView['type']): string {
+    switch (type) {
+      case 'TABUNG': return '⭐';
+      case 'CASA': return '🏦';
+      case 'TAKAFUL': return '🛡️';
+      case 'ADVISOR_HUMAN': return '🤝';
+      default: return '→';
+    }
+  }
+
   private scrollSoon(): void {
     setTimeout(() => {
       const el = document.querySelector('mf-advisor')?.shadowRoot?.querySelector('.messages')
         ?? document.querySelector('.messages');
       if (el) (el as HTMLElement).scrollTop = (el as HTMLElement).scrollHeight;
     }, 50);
-  }
-
-  fmt(n: number): string {
-    return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
   }
 }

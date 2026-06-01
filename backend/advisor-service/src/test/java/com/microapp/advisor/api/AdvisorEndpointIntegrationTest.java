@@ -7,8 +7,9 @@ import akka.javasdk.testkit.TestKit;
 import akka.javasdk.testkit.TestKitSupport;
 import akka.javasdk.testkit.TestModelProvider;
 import com.microapp.advisor.application.WealthAdvisorAgent;
-import com.microapp.advisor.application.WealthAdvisorAgent.AdvisorResponse;
-import com.microapp.advisor.application.WealthAdvisorAgent.Proposal;
+import com.microapp.advisor.domain.AdvisorResponse;
+import com.microapp.advisor.domain.AdvisorResponse.ProposedAction;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,42 +27,48 @@ public class AdvisorEndpointIntegrationTest extends TestKitSupport {
   }
 
   @Test
-  public void postAskReturnsProposalOverHttp() {
+  public void postAskReturnsTabungActionOverHttp() {
     var agentReply =
         new AdvisorResponse(
-            "At RM 1,900/month you'd reach RM 45,600 in 24 months — achievable.",
-            new Proposal(
-                "CREATE_TABUNG_GOAL",
-                "Hajj Tabung",
-                "Open a tabung goal to save for Hajj over 2 years.",
-                45600.0,
-                1900.0,
-                "",
-                "Based on your ~RM 1,900/month surplus."),
-            true);
+            "Your monthly surplus is around RM 5,800. A holiday fund of RM 12,000 over 24 months "
+                + "needs RM 500/month — well within budget.",
+            new ProposedAction(
+                ProposedAction.Type.TABUNG,
+                "Start a Bali Tabung",
+                Map.of(
+                    "category", "HOLIDAY",
+                    "name", "Bali 2028",
+                    "targetAmount", "12000",
+                    "targetDate", "2028-06-01")),
+            false);
     advisorModel.fixedResponse(JsonSupport.encodeToString(agentReply));
 
     var response =
         httpClient
             .POST("/advisor/acc-1001/ask")
-            .withRequestBody(new AdvisorEndpoint.AskRequest("Can I afford to save for Hajj in 2 years?"))
+            .withRequestBody(new AdvisorEndpoint.AskRequest("Can I afford a holiday in 2 years?"))
             .responseBodyAs(AdvisorEndpoint.AskResponse.class)
             .invoke();
 
     assertThat(response.status().isSuccess()).isTrue();
     var body = response.body();
-    assertThat(body.humanHandoffOffered()).isTrue();
-    assertThat(body.proposal()).isNotNull();
-    assertThat(body.proposal().actionType()).isEqualTo("CREATE_TABUNG_GOAL");
-    assertThat(body.proposal().monthlyContribution()).isEqualTo(1900.0);
+    assertThat(body.message()).contains("RM 5,800");
+    assertThat(body.action()).isNotNull();
+    assertThat(body.action().type()).isEqualTo("TABUNG"); // stringified for JSON
+    assertThat(body.action().label()).isEqualTo("Start a Bali Tabung");
+    assertThat(body.action().params())
+        .containsEntry("category", "HOLIDAY")
+        .containsEntry("name", "Bali 2028")
+        .containsEntry("targetAmount", "12000");
+    assertThat(body.needsHuman()).isFalse();
   }
 
   @Test
-  public void postAskOmitsProposalWhenNone() {
+  public void postAskOmitsActionWhenAdviceOnly() {
     var agentReply =
         new AdvisorResponse(
             "Happy to help — what would you like to plan for?",
-            new Proposal("NONE", "", "", 0, 0, "", ""),
+            null,
             false);
     advisorModel.fixedResponse(JsonSupport.encodeToString(agentReply));
 
@@ -74,8 +81,51 @@ public class AdvisorEndpointIntegrationTest extends TestKitSupport {
 
     assertThat(response.status().isSuccess()).isTrue();
     var body = response.body();
-    assertThat(body.proposal()).isNull(); // NONE is mapped to no proposal
-    assertThat(body.humanHandoffOffered()).isFalse();
-    assertThat(body.reply()).isNotBlank();
+    assertThat(body.action()).isNull();
+    assertThat(body.needsHuman()).isFalse();
+    assertThat(body.message()).isNotBlank();
+  }
+
+  @Test
+  public void postAskDropsNoneTypedActionToNull() {
+    // The agent shouldn't normally pick NONE-with-a-label, but if it does, the endpoint
+    // normalises it away — the client gets a clean null instead of a button labelled "—".
+    var agentReply =
+        new AdvisorResponse(
+            "Nothing specific to do right now.",
+            new ProposedAction(ProposedAction.Type.NONE, "Ignore me", Map.of()),
+            false);
+    advisorModel.fixedResponse(JsonSupport.encodeToString(agentReply));
+
+    var response =
+        httpClient
+            .POST("/advisor/acc-1001/ask")
+            .withRequestBody(new AdvisorEndpoint.AskRequest("anything else?"))
+            .responseBodyAs(AdvisorEndpoint.AskResponse.class)
+            .invoke();
+
+    assertThat(response.body().action()).isNull();
+  }
+
+  @Test
+  public void postAskOffersHumanHandoffForConsequentialActions() {
+    var agentReply =
+        new AdvisorResponse(
+            "Personal financing is a regulated product — a licensed advisor will follow up with you.",
+            ProposedAction.humanHandoff("Have an advisor follow up"),
+            true);
+    advisorModel.fixedResponse(JsonSupport.encodeToString(agentReply));
+
+    var response =
+        httpClient
+            .POST("/advisor/acc-1001/ask")
+            .withRequestBody(new AdvisorEndpoint.AskRequest("I'd like personal financing"))
+            .responseBodyAs(AdvisorEndpoint.AskResponse.class)
+            .invoke();
+
+    var body = response.body();
+    assertThat(body.action()).isNotNull();
+    assertThat(body.action().type()).isEqualTo("ADVISOR_HUMAN");
+    assertThat(body.needsHuman()).isTrue();
   }
 }

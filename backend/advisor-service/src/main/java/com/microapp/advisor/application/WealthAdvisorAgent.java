@@ -10,18 +10,29 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.microapp.advisor.domain.AdvisorResponse;
+import com.microapp.advisor.domain.AdvisorResponse.ProposedAction;
 import com.microapp.advisor.domain.AffordabilityProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Conversational, Shariah-aware wealth advisor (K1).
+ * Conversational wealth advisor (K1) — refactored to return a structured
+ * {@link AdvisorResponse} and to keep its advice constrained to MBSB-only data.
  *
- * One command handler ({@link #ask}) drives a multi-turn conversation via session
- * memory (session id supplied by the caller, per customer). The LLM grounds its
- * answers by calling the {@code @FunctionTool} methods below, which reach into the
- * other services over HTTP. It may PROPOSE one action but never executes money
- * movement — consequential actions are deferred to a human via requestHumanHandoff.
+ * <p>Guardrails are layered:</p>
+ * <ul>
+ *   <li>Tool-level — every {@code @FunctionTool} method only reaches into MBSB
+ *       services (statement / analysis / product / goals). The agent can't see
+ *       a non-MBSB product even if it tried.</li>
+ *   <li>System prompt — explicit MBSB-only scope and off-topic redirect rules.</li>
+ *   <li>Closed action enum — the agent picks from {@link ProposedAction.Type}
+ *       only; no free-form URLs.</li>
+ *   <li>Structured response — {@code responseConformsTo(AdvisorResponse.class)}
+ *       forces the model output into the schema.</li>
+ * </ul>
+ *
+ * <p>Per-customer session id = customerId so the conversation is multi-turn.</p>
  */
 @Component(id = "wealth-advisor")
 public class WealthAdvisorAgent extends Agent {
@@ -31,68 +42,69 @@ public class WealthAdvisorAgent extends Agent {
 
   private static final String SYSTEM_MESSAGE =
       """
-      You are "K", a warm, Shariah-aware wealth advisor for an Islamic bank.
-      You help customers save, budget, and choose suitable products.
+      You are "K", a warm wealth advisor for MBSB Bank, a Malaysian Islamic bank.
+      You help MBSB customers save, budget, and choose suitable MBSB products.
 
-      Rules:
-      - ALWAYS ground financial figures in the customer's real data. Use the tools:
-        getAccountSummary (balances in/out + estimated monthly surplus),
-        getSpendingProfile (spend by category), getGoals (existing savings goals),
-        projectAffordability (is a target reachable?), listProducts (catalog).
-      - Never invent numbers. Use the values returned by the tools.
-      - Propose at most ONE concrete next action. Prefer halal / Shariah-compliant options.
-      - You may PROPOSE actions, but you must NEVER move money or open a product yourself.
-        If the customer wants to proceed, call requestHumanHandoff and set
-        humanHandoffOffered = true.
-      - Keep replies concise, friendly, and practical.
+      SCOPE — GUARDRAILS
+      - You ONLY discuss MBSB products and the customer's MBSB-held data.
+      - If asked about non-MBSB products, other banks, crypto, politics, or off-topic
+        matters: politely redirect to MBSB banking and offer a sensible next step.
+      - Never invent a product. Never invent a number. Use only what the tools return.
+      - Lead with secular examples (holiday, emergency fund, house deposit, education).
+        Religious savings are valid only if the customer raises them first.
 
-      Filling the response:
-      - reply: your conversational answer, including the real numbers.
-      - proposal: ALWAYS include this object. When you are proposing a specific action,
-        set actionType (e.g. CREATE_TABUNG_GOAL, OPEN_TAKAFUL, OPEN_PRODUCT) and fill the
-        fields. When you are NOT proposing anything, set actionType to "NONE" and leave the
-        other fields empty (0 or "").
-      - humanHandoffOffered: true when you have offered or logged a human follow-up.
+      GROUNDING — call tools BEFORE answering any numeric question
+      - getAccountSummary    — balances in/out + estimated monthly surplus
+      - getSpendingProfile   — spend by category
+      - getGoals             — the customer's existing savings goals (tabungs)
+      - listProducts         — MBSB catalogue (filter by type if useful)
+      - projectAffordability — is a target reachable given monthly surplus?
+      - requestHumanHandoff  — ONLY when the customer wants to proceed with a
+        consequential action (open a financing product, move money); never for advice.
+
+      RESPONSE SHAPE — you MUST conform
+        {
+          "message":     "<your reply in plain language, citing real numbers>",
+          "action":      <one ProposedAction or null>,
+          "needsHuman":  <true ONLY if you offered or logged a human follow-up>
+        }
+      ProposedAction.type MUST be one of: TABUNG, CASA, TAKAFUL, ADVISOR_HUMAN, NONE.
+
+      ACTION TYPES — pick exactly one, or set action to null when advising only
+      - TABUNG (preferred for "I want to save for X"):
+          label:  "Start a <name> Tabung"
+          params: {
+            "category":     one of HOLIDAY, HOUSE, EMERGENCY, EDUCATION, HAJJ, OTHER,
+            "name":         short display name (e.g. "Bali 2028", "Emergency Fund"),
+            "targetAmount": RM amount as a string (e.g. "12000"),
+            "targetDate":   "YYYY-MM-DD"
+          }
+      - CASA:    label: "Open a CASA account",    params: {} (no pre-fill)
+      - TAKAFUL: label: "Open a Takaful plan",    params: { "planId": "<id from listProducts>" } when known, else {}
+      - ADVISOR_HUMAN: pair with needsHuman=true and a call to requestHumanHandoff.
+          label: "Have an advisor follow up", params: {}
+      - NONE: omit (set action to null) when only advice is needed.
+
+      STYLE — short, friendly, practical. Cite real numbers. Propose at most ONE action.
+      Prefer the lightest commitment (a Tabung) over the heaviest (financing).
       """;
 
-  // ---- message model (inner records) ----
+  // ---- input ----
 
   public record Question(String customerId, String message) {}
 
-  public record Proposal(
-      @Description("Action type: CREATE_TABUNG_GOAL, OPEN_TAKAFUL, OPEN_PRODUCT, or NONE when not proposing")
-      String actionType,
-      @Description("Short title for the proposed action")
-      String title,
-      @Description("One or two sentence description of the proposal")
-      String description,
-      @Description("Target amount, if relevant; otherwise 0")
-      double targetAmount,
-      @Description("Suggested monthly contribution, if relevant; otherwise 0")
-      double monthlyContribution,
-      @Description("Related product id from the catalog, if any; otherwise empty")
-      String productId,
-      @Description("Why this is being proposed, grounded in the customer's data")
-      String rationale) {}
-
-  public record AdvisorResponse(
-      @Description("Conversational answer to the customer, including real figures")
-      String reply,
-      @Description("Always present; actionType=NONE when not proposing an action")
-      Proposal proposal,
-      @Description("True when a human advisor follow-up has been offered or logged")
-      boolean humanHandoffOffered) {}
-
-  // ---- cross-service HTTP clients ----
+  // ---- cross-service HTTP clients (all MBSB-bounded) ----
 
   private final HttpClient statementClient;
   private final HttpClient analysisClient;
   private final HttpClient productClient;
+  private final HttpClient goalsClient;
 
   public WealthAdvisorAgent(HttpClientProvider httpClientProvider) {
     this.statementClient = httpClientProvider.httpClientFor("statement-service");
     this.analysisClient = httpClientProvider.httpClientFor("analysis-service");
     this.productClient = httpClientProvider.httpClientFor("product-service");
+    this.goalsClient = httpClientProvider.httpClientFor("goals-service");
   }
 
   // ---- command handler ----
@@ -106,15 +118,13 @@ public class WealthAdvisorAgent extends Agent {
         .responseConformsTo(AdvisorResponse.class)
         .onFailure(err -> {
           log.warn("Advisor response failed", err);
-          return new AdvisorResponse(
-              "Sorry, I couldn't work that out just now. Let me connect you with a human advisor.",
-              new Proposal("NONE", "", "", 0, 0, "", ""),
-              true);
+          return AdvisorResponse.handoff(
+              "Sorry, I couldn't work that out just now. Let me connect you with a human advisor.");
         })
         .thenReply();
   }
 
-  // ---- function tools ----
+  // ---- function tools (all MBSB-only) ----
 
   @FunctionTool(
       description =
@@ -186,8 +196,9 @@ public class WealthAdvisorAgent extends Agent {
 
   @FunctionTool(
       description =
-          "Lists products in the catalog (savings, takaful, cards, wealth). Optionally filter by "
-              + "type/category. Use to find a suitable product to propose.")
+          "Lists MBSB products in the catalog (savings, takaful, cards, wealth). Optionally filter "
+              + "by type/category. Use to find a suitable MBSB product to propose. The catalog is "
+              + "MBSB-only; non-MBSB products are not available.")
   public String listProducts(
       @Description("Optional type/category filter, e.g. 'Savings' or 'Takaful'; empty for all") String type) {
     try {
@@ -213,10 +224,20 @@ public class WealthAdvisorAgent extends Agent {
 
   @FunctionTool(
       description =
-          "Returns the customer's existing savings goals (tabung). Currently returns none — the "
-              + "goals service is not built yet.")
+          "Returns the customer's existing MBSB savings goals (tabungs): id, name, category, target "
+              + "and current amount, progress. Use this before proposing a new tabung to avoid "
+              + "duplicating an existing one.")
   public String getGoals(@Description("Customer/account id") String customerId) {
-    return "{\"customerId\":\"" + customerId + "\",\"goals\":[],\"note\":\"No savings goals on file yet.\"}";
+    try {
+      return goalsClient
+          .GET("/customers/" + customerId + "/goals")
+          .responseBodyAs(String.class)
+          .invoke()
+          .body();
+    } catch (Exception e) {
+      log.warn("getGoals failed for {}", customerId, e);
+      return "{\"customerId\":\"" + customerId + "\",\"goals\":[],\"note\":\"goals-service unavailable\"}";
+    }
   }
 
   @FunctionTool(
@@ -225,7 +246,7 @@ public class WealthAdvisorAgent extends Agent {
               + "and the monthly surplus available (use estimatedMonthlySurplus from getAccountSummary), "
               + "returns whether it's feasible, the required monthly saving, and any shortfall.")
   public AffordabilityProjection projectAffordability(
-      @Description("Target amount to save, e.g. 45000") double targetAmount,
+      @Description("Target amount to save, e.g. 12000") double targetAmount,
       @Description("Number of months to save over, e.g. 24") int months,
       @Description("Monthly surplus available to save") double monthlySurplus) {
     return AffordabilityProjection.project(targetAmount, months, monthlySurplus);
@@ -234,11 +255,12 @@ public class WealthAdvisorAgent extends Agent {
   @FunctionTool(
       description =
           "Logs a request for a human advisor to follow up with the customer about a topic. Call this "
-              + "only when the customer wants to proceed with a consequential action (open a product or "
-              + "move money). Returns a confirmation; an advisor will follow up.")
+              + "ONLY when the customer wants to proceed with a consequential action (open a financing "
+              + "product or move money). Pair with action.type=ADVISOR_HUMAN and needsHuman=true in your "
+              + "response.")
   public String requestHumanHandoff(
       @Description("Customer/account id") String customerId,
-      @Description("Topic, e.g. 'open a Hajj tabung savings goal'") String topic) {
+      @Description("Topic, e.g. 'open a holiday tabung'") String topic) {
     log.info("HUMAN HANDOFF requested: customer={} topic={}", customerId, topic);
     return "Logged. A licensed advisor will follow up with " + customerId + " about: " + topic;
   }

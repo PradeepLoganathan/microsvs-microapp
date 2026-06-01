@@ -6,9 +6,10 @@ import akka.javasdk.JsonSupport;
 import akka.javasdk.testkit.TestKit;
 import akka.javasdk.testkit.TestKitSupport;
 import akka.javasdk.testkit.TestModelProvider;
-import com.microapp.advisor.application.WealthAdvisorAgent.AdvisorResponse;
-import com.microapp.advisor.application.WealthAdvisorAgent.Proposal;
 import com.microapp.advisor.application.WealthAdvisorAgent.Question;
+import com.microapp.advisor.domain.AdvisorResponse;
+import com.microapp.advisor.domain.AdvisorResponse.ProposedAction;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,46 +27,116 @@ public class WealthAdvisorAgentTest extends TestKitSupport {
   }
 
   @Test
-  public void returnsStructuredProposal() {
+  public void returnsStructuredTabungAction() {
     var expected =
         new AdvisorResponse(
-            "At RM 1,900/month you'd reach RM 45,600 in 24 months — that's achievable.",
-            new Proposal(
-                "CREATE_TABUNG_GOAL",
-                "Hajj Tabung",
-                "Open a tabung goal to save for Hajj over 2 years.",
-                45600.0,
-                1900.0,
-                "",
-                "Based on your estimated ~RM 1,900/month surplus."),
+            "Your monthly surplus is around RM 5,800. A holiday fund of RM 12,000 over 24 months "
+                + "needs RM 500/month — well within budget.",
+            new ProposedAction(
+                ProposedAction.Type.TABUNG,
+                "Start a Bali Tabung",
+                Map.of(
+                    "category", "HOLIDAY",
+                    "name", "Bali 2028",
+                    "targetAmount", "12000",
+                    "targetDate", "2028-06-01")),
+            false);
+    advisorModel.fixedResponse(JsonSupport.encodeToString(expected));
+
+    var result =
+        componentClient
+            .forAgent()
+            .inSession("test-tabung")
+            .method(WealthAdvisorAgent::ask)
+            .invoke(new Question("acc-1001", "Can I afford to save for a holiday in 2 years?"));
+
+    assertThat(result).isEqualTo(expected);
+    assertThat(result.action()).isNotNull();
+    assertThat(result.action().type()).isEqualTo(ProposedAction.Type.TABUNG);
+    assertThat(result.action().params()).containsEntry("category", "HOLIDAY");
+    assertThat(result.needsHuman()).isFalse();
+  }
+
+  @Test
+  public void returnsCasaActionWithEmptyParams() {
+    var expected =
+        new AdvisorResponse(
+            "You'll need an MBSB current/savings account before we can set up a savings goal. "
+                + "Want to open one now?",
+            ProposedAction.casa("Open a CASA account"),
+            false);
+    advisorModel.fixedResponse(JsonSupport.encodeToString(expected));
+
+    var result =
+        componentClient
+            .forAgent()
+            .inSession("test-casa")
+            .method(WealthAdvisorAgent::ask)
+            .invoke(new Question("visitor-1", "I'm new — where do I start?"));
+
+    assertThat(result.action()).isNotNull();
+    assertThat(result.action().type()).isEqualTo(ProposedAction.Type.CASA);
+    assertThat(result.action().label()).isEqualTo("Open a CASA account");
+    assertThat(result.action().params()).isEmpty();
+  }
+
+  @Test
+  public void returnsAdviceOnlyWhenNoActionFits() {
+    var expected =
+        new AdvisorResponse(
+            "Your spending is well within your income — about RM 5,800/month surplus on average. "
+                + "Keep it up.",
+            null,
+            false);
+    advisorModel.fixedResponse(JsonSupport.encodeToString(expected));
+
+    var result =
+        componentClient
+            .forAgent()
+            .inSession("test-no-action")
+            .method(WealthAdvisorAgent::ask)
+            .invoke(new Question("acc-1001", "How is my spending this month?"));
+
+    assertThat(result.action()).isNull();
+    assertThat(result.needsHuman()).isFalse();
+    assertThat(result.message()).contains("surplus");
+  }
+
+  @Test
+  public void offersHumanHandoffForConsequentialActions() {
+    var expected =
+        new AdvisorResponse(
+            "Personal financing is a regulated product — a licensed advisor will follow up with you.",
+            ProposedAction.humanHandoff("Have an advisor follow up"),
             true);
     advisorModel.fixedResponse(JsonSupport.encodeToString(expected));
 
     var result =
         componentClient
             .forAgent()
-            .inSession("test-session-1")
+            .inSession("test-handoff")
             .method(WealthAdvisorAgent::ask)
-            .invoke(new Question("acc-1001", "Can I afford to save for Hajj in 2 years?"));
+            .invoke(new Question("acc-1001", "I'd like to take out a personal financing loan"));
 
-    assertThat(result).isEqualTo(expected);
-    assertThat(result.proposal().actionType()).isEqualTo("CREATE_TABUNG_GOAL");
-    assertThat(result.humanHandoffOffered()).isTrue();
+    assertThat(result.action()).isNotNull();
+    assertThat(result.action().type()).isEqualTo(ProposedAction.Type.ADVISOR_HUMAN);
+    assertThat(result.needsHuman()).isTrue();
   }
 
   @Test
-  public void fallsBackToHumanHandoffOnBadModelOutput() {
-    advisorModel.fixedResponse("this is not valid json");
+  public void fallsBackToHandoffOnInvalidModelOutput() {
+    // The agent's responseConformsTo cannot parse this — onFailure should kick in.
+    advisorModel.fixedResponse("this is not valid json at all");
 
     var result =
         componentClient
             .forAgent()
-            .inSession("test-session-2")
+            .inSession("test-bad-output")
             .method(WealthAdvisorAgent::ask)
             .invoke(new Question("acc-1001", "hello"));
 
-    assertThat(result.humanHandoffOffered()).isTrue();
-    assertThat(result.proposal().actionType()).isEqualTo("NONE");
-    assertThat(result.reply()).containsIgnoringCase("advisor");
+    assertThat(result.needsHuman()).isTrue();
+    assertThat(result.action()).isNull();
+    assertThat(result.message()).containsIgnoringCase("advisor");
   }
 }

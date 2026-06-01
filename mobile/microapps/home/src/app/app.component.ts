@@ -341,6 +341,26 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAll();
+    this.applyTabungQueryParams();
+  }
+
+  /**
+   * Honor a `?openTabung=CATEGORY&name=…&target=…&date=…` URL hint so the advisor
+   * can pre-fill and open the "+ Add Tabung" form when a customer accepts its
+   * proposed action.
+   */
+  private applyTabungQueryParams(): void {
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get('openTabung');
+    if (!category) return;
+    const target = Number(params.get('target'));
+    this.newGoal = {
+      name: params.get('name') || '',
+      category: category.toUpperCase(),
+      targetAmount: Number.isFinite(target) && target > 0 ? target : null,
+      targetDate: params.get('date') || '',
+    };
+    this.showAdd = true;
   }
 
   loadAll(): void {
