@@ -121,6 +121,19 @@
       <div style="margin-top:16px"><a class="link" id="appLink" href="http://localhost:4200" target="mbsb-banking-app" rel="noopener" onclick="openApp(event)">↗ Open / refresh the banking app (:4200)</a></div>
     </section>
 
+    <!-- tabs in manifest -->
+    <section class="card full">
+      <h2>Micro-apps in this manifest — add / remove tabs live</h2>
+      <div class="vmeta" style="margin-bottom:10px">Advisor tab:</div>
+      <div class="seg" id="advisorSeg">
+        <button data-show="false" onclick="setTab('advisor', false)">Hide</button>
+        <button data-show="true" onclick="setTab('advisor', true)">Show</button>
+      </div>
+      <div class="vmeta">
+        Toggling this removes (or re-adds) the <i>advisor</i> entry in the active persona's manifest. The shell renders its tab bar from the manifest, so the Advisor tab vanishes / reappears after a phone refresh — no rebuild, no app-store release.
+      </div>
+    </section>
+
     <!-- version toggle -->
     <section class="card full">
       <h2>Statement Analysis micro-app — live version (active persona's channel)</h2>
@@ -196,6 +209,11 @@
       $('#curVer').textContent = s.version || '— (platform not seeded)';
       document.querySelectorAll('#seg button').forEach((b) =>
         b.classList.toggle('active', b.dataset.v === s.version));
+
+      // Reflect the advisor tab presence in its segment toggle
+      const advisorPresent = Array.isArray(s.microapps) && s.microapps.includes('advisor');
+      document.querySelectorAll('#advisorSeg button').forEach((b) =>
+        b.classList.toggle('active', (b.dataset.show === 'true') === advisorPresent));
     } catch (e) {
       $('#services').innerHTML = '<div class="svc"><span class="name" style="color:var(--danger)">console helper unreachable</span></div>';
     }
@@ -272,6 +290,22 @@
     // opening (or re-navigating) it to a URL with the chosen persona param.
     window.open(appUrlFor(p), 'mbsb-banking-app');
     toast('Persona → ' + (PERSONA_LABEL[p] || p) + '  ·  banking app reloading.');
+  }
+
+  async function setTab(name, present) {
+    const p = currentPersona();
+    toast((present ? 'Adding ' : 'Removing ') + name + ' on ' + (PERSONA_LABEL[p] || p) + ' …');
+    try {
+      const r = await fetch('/api/tab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, present, persona: p }),
+      });
+      const j = await r.json();
+      if (j.ok) toast(name + ' ' + j.action + ' on channel ' + j.channel + ' — refresh the phone (⌘⇧R) to see the tab change.');
+      else toast('Could not toggle: ' + (j.error || j.status));
+    } catch (e) { toast('Error: ' + e); }
+    refresh();
   }
 
   async function setVersion(v) {

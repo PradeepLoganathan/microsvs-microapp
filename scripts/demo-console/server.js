@@ -30,6 +30,18 @@ const SERVICES = [
   { name: 'customer-service', port: 8088 },
   { name: 'goals-service', port: 8089 },
 ];
+// Canonical manifest entries used when re-adding a previously-removed micro-app.
+// Keep these in sync with platform-service's ManifestEndpoint.seedChannel().
+const DEFAULT_ENTRIES = {
+  'home':               { name: 'home',               version: '1.0.0', remoteEntry: '/bundles/home/1.0.0/main.js',               exposedModule: './Module', elementTag: 'mf-home' },
+  'statement-details':  { name: 'statement-details',  version: '1.0.0', remoteEntry: '/bundles/statement-details/1.0.0/main.js',  exposedModule: './Module', elementTag: 'mf-statement-details' },
+  'statement-analysis': { name: 'statement-analysis', version: '1.0.0', remoteEntry: '/bundles/statement-analysis/1.0.0/main.js', exposedModule: './Module', elementTag: 'mf-statement-analysis' },
+  'recommendations':    { name: 'recommendations',    version: '1.0.0', remoteEntry: '/bundles/recommendations/1.0.0/main.js',    exposedModule: './Module', elementTag: 'mf-recommendations' },
+  'advisor':            { name: 'advisor',            version: '1.0.0', remoteEntry: '/bundles/advisor/1.0.0/main.js',            exposedModule: './Module', elementTag: 'mf-advisor' },
+  'onboarding':         { name: 'onboarding',         version: '1.0.0', remoteEntry: '/bundles/onboarding/1.0.0/main.js',         exposedModule: './Module', elementTag: 'mf-onboarding' },
+  'prelogin':           { name: 'prelogin',           version: '1.0.0', remoteEntry: '/bundles/prelogin/1.0.0/main.js',           exposedModule: './Module', elementTag: 'mf-prelogin' },
+};
+
 const SEED_TARGETS = [
   ['statement-service', 'http://localhost:8082/accounts/seed'],
   ['product-service', 'http://localhost:8085/products/seed'],
@@ -72,19 +84,22 @@ async function getStatus(personaParam) {
   const shell = await request('GET', `http://localhost:${SHELL_PORT}/`);
   services.push({ name: 'banking-shell (UI)', port: SHELL_PORT, up: shell.ok });
 
-  // Look up the statement-analysis version on the channel the console currently
-  // tracks (i.e. the active persona) so the v1/v2 segment reflects what that
-  // persona is actually serving.
+  // Look up the statement-analysis version + the list of present micro-apps on
+  // the channel the console currently tracks, so the v1/v2 segment and the
+  // tabs toggle both reflect that persona's manifest.
   const channel = channelFor(personaParam);
   let version = null;
+  let microapps = [];
   const m = await request('GET', `${PLATFORM}/microfrontends/manifest/${channel}`);
   if (m.ok && m.status === 200) {
     try {
-      const sa = (JSON.parse(m.body).microfrontends || []).find((x) => x.name === 'statement-analysis');
+      const entries = JSON.parse(m.body).microfrontends || [];
+      microapps = entries.map((x) => x.name);
+      const sa = entries.find((x) => x.name === 'statement-analysis');
       if (sa) version = sa.version;
     } catch (_) {}
   }
-  return { services, version, channel };
+  return { services, version, channel, microapps };
 }
 
 function channelFor(persona) {
@@ -104,6 +119,30 @@ async function setVersion(version, persona) {
   sa.remoteEntry = `/bundles/statement-analysis/${version}/main.js`;
   const put = await request('PUT', `${PLATFORM}/microfrontends/manifest/${channel}`, manifest);
   return { ok: put.ok && put.status >= 200 && put.status < 300, status: put.status, version, channel };
+}
+
+// Adds/removes a single micro-app entry on the active persona's manifest.
+// "Adding" uses the canonical default entry from DEFAULT_ENTRIES so a previously
+// removed app comes back with the same routing the platform-service would seed.
+async function setTabPresence(name, present, persona) {
+  if (!DEFAULT_ENTRIES[name]) return { ok: false, error: `unknown micro-app: ${name}` };
+  const channel = channelFor(persona);
+  const m = await request('GET', `${PLATFORM}/microfrontends/manifest/${channel}`);
+  if (!m.ok || m.status !== 200) return { ok: false, error: `manifest not seeded for ${channel}` };
+  let manifest;
+  try { manifest = JSON.parse(m.body); } catch (_) { return { ok: false, error: 'bad manifest' }; }
+
+  const isPresent = (manifest.microfrontends || []).some((x) => x.name === name);
+  if (present === isPresent) return { ok: true, status: 'noop', channel, name, action: 'kept' };
+
+  if (present) {
+    manifest.microfrontends.push(DEFAULT_ENTRIES[name]);
+  } else {
+    manifest.microfrontends = manifest.microfrontends.filter((x) => x.name !== name);
+  }
+
+  const put = await request('PUT', `${PLATFORM}/microfrontends/manifest/${channel}`, manifest);
+  return { ok: put.ok && put.status >= 200 && put.status < 300, status: put.status, channel, name, action: present ? 'added' : 'removed' };
 }
 
 async function seed() {
@@ -171,6 +210,14 @@ const server = http.createServer(async (req, res) => {
       try { const b = JSON.parse(await readBody(req)); v = b.version; persona = b.persona; } catch (_) {}
       if (v !== '1.0.0' && v !== '2.0.0') return send(res, 400, { ok: false, error: 'version must be "1.0.0" or "2.0.0"' });
       return send(res, 200, await setVersion(v, persona));
+    }
+    if (u.pathname === '/api/tab' && req.method === 'POST') {
+      let name = null, present = null, persona = null;
+      try { const b = JSON.parse(await readBody(req)); name = b.name; present = b.present; persona = b.persona; } catch (_) {}
+      if (typeof name !== 'string' || typeof present !== 'boolean') {
+        return send(res, 400, { ok: false, error: 'body must be {name: string, present: boolean, persona?: string}' });
+      }
+      return send(res, 200, await setTabPresence(name, present, persona));
     }
     send(res, 404, { error: 'not found' });
   } catch (e) {
