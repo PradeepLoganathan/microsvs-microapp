@@ -34,7 +34,7 @@ const STORAGE_KEY = 'mbsb-customer-id';
     <div class="pl">
       <div class="hero">
         <div class="brand">MBSB <span>NextGen</span></div>
-        <div class="tag">Islamic banking, reimagined.</div>
+        <div class="tag">Be Bold. Bank Smart.</div>
         <div class="proof" *ngIf="info">{{ info.customerCount }}+ customers have joined</div>
       </div>
 

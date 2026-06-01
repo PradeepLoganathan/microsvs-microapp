@@ -19,7 +19,15 @@ public class NbaEngine {
   private static final Logger log = LoggerFactory.getLogger(NbaEngine.class);
 
   private static final Set<String> TRAVEL_MERCHANT_HINTS =
-      Set.of("air", "airlines", "airways", "flight", "hotel", "agoda", "booking", "expedia", "klia");
+      Set.of("air", "airlines", "airways", "flight", "hotel", "agoda", "booking", "expedia", "klia",
+             "resort", "shangri-la", "pullman", "marriott", "hilton", "mandarin");
+
+  private static final Set<String> AIRLINE_HINTS =
+      Set.of("airasia", "airlines", "airways", "firefly", "batik air", "flight");
+  private static final Set<String> HOTEL_HINTS =
+      Set.of("hotel", "resort", "shangri-la", "pullman", "marriott", "hilton", "mandarin", "majestic");
+  private static final Set<String> BOOKING_HINTS =
+      Set.of("agoda", "booking", "expedia", "klook", "trip.com");
 
   private static final double LARGE_TXN_THRESHOLD = 350.0;
   private static final double SALARY_THRESHOLD = 5_000.0;
@@ -57,16 +65,40 @@ public class NbaEngine {
     }
 
     if (looksLikeTravel(req)) {
-      return new Nba(
-          "travel_takaful",
-          "Travelling often? Shariah-compliant travel cover from RM 18/trip",
-          "We saw a RM " + amount + " charge"
-              + (req.merchant() != null ? " at " + req.merchant() : "")
-              + " — travel takaful covers trip cancellation and medical abroad.",
-          "See travel takaful");
+      return travelTakaful(amount, req.merchant());
     }
 
     return null;
+  }
+
+  private static Nba travelTakaful(double amount, String merchant) {
+    var m = merchant == null ? "" : merchant.toLowerCase(Locale.ROOT);
+    String headline, reason;
+    var atMerchant = (merchant != null && !merchant.isBlank()) ? " at " + merchant : "";
+
+    if (containsAny(m, AIRLINE_HINTS)) {
+      headline = "Flying often? Travel takaful from RM 18/trip";
+      reason = "We saw a RM " + amount + " flight charge" + atMerchant
+          + " — Shariah-compliant cover for flight delays, lost baggage and medical emergencies abroad.";
+    } else if (containsAny(m, HOTEL_HINTS)) {
+      headline = "Staying away from home? Travel takaful from RM 18/trip";
+      reason = "We saw a RM " + amount + " hotel charge" + atMerchant
+          + " — cover for stay cancellations, room theft and trip emergencies, Shariah-compliant.";
+    } else if (containsAny(m, BOOKING_HINTS)) {
+      headline = "Planning a trip? Travel takaful from RM 18/trip";
+      reason = "We saw a RM " + amount + " booking" + atMerchant
+          + " — protect your trip end-to-end against cancellations and emergencies.";
+    } else {
+      headline = "Travelling? Travel takaful from RM 18/trip";
+      reason = "We saw a RM " + amount + " travel charge" + atMerchant
+          + " — Shariah-compliant cover for cancellations, baggage and medical emergencies.";
+    }
+    return new Nba("travel_takaful", headline, reason, "See travel takaful");
+  }
+
+  private static boolean containsAny(String haystack, Set<String> needles) {
+    for (var n : needles) if (haystack.contains(n)) return true;
+    return false;
   }
 
   private static Nba evaluateSalaryCredit(NbaRequest req) {

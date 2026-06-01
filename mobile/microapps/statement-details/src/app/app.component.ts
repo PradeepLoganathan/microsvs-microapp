@@ -50,37 +50,27 @@ interface StatementDetail {
         >
           <div class="card-header">
             <div class="card-period">{{ stmt.periodStart }} — {{ stmt.periodEnd }}</div>
+            <div class="card-chevron">{{ expandedStatementId === stmt.statementId ? '\u25B2' : '\u25BC' }}</div>
             <div class="card-meta">
-              <span class="card-debits">Debits: {{ stmt.totalDebits | currency:'MYR':'RM ':'1.2-2' }}</span>
+              <span class="card-debits">{{ stmt.totalDebits | currency:'MYR':'RM ':'1.2-2' }} debited</span>
+              <span class="card-dot">·</span>
               <span class="card-count">{{ stmt.transactionCount }} transactions</span>
             </div>
-            <div class="card-chevron">{{ expandedStatementId === stmt.statementId ? '\u25B2' : '\u25BC' }}</div>
           </div>
 
           <div *ngIf="expandedStatementId === stmt.statementId" class="card-body" (click)="$event.stopPropagation()">
             <div *ngIf="transactionsLoading" class="loading-small">Loading transactions...</div>
             <div *ngIf="transactionsError" class="error-small">{{ transactionsError }}</div>
 
-            <table *ngIf="!transactionsLoading && !transactionsError && transactions.length > 0" class="transactions-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Merchant</th>
-                  <th>Category</th>
-                  <th class="amount-col">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let txn of transactions">
-                  <td>{{ txn.date }}</td>
-                  <td>{{ txn.merchant }}</td>
-                  <td>{{ txn.category }}</td>
-                  <td class="amount-col negative">
-                    -{{ txn.amount | currency:'MYR':'RM ':'1.2-2' }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div *ngIf="!transactionsLoading && !transactionsError && transactions.length > 0" class="txn-list">
+              <div *ngFor="let txn of transactions" class="txn-row">
+                <div class="txn-main">
+                  <div class="txn-merchant">{{ txn.merchant }}</div>
+                  <div class="txn-meta">{{ txn.date }} · {{ txn.category }}</div>
+                </div>
+                <div class="txn-amount">-{{ txn.amount | currency:'MYR':'RM ':'1.2-2' }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -124,30 +114,37 @@ interface StatementDetail {
       box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     }
     .card-header {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
-      padding: 16px 20px;
-      gap: 12px;
+      padding: 14px 18px;
+      column-gap: 12px;
+      row-gap: 4px;
     }
     .card-period {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       color: #2c3e50;
-      flex: 0 0 auto;
+      min-width: 0;
+      white-space: nowrap;
     }
-    .card-meta {
-      flex: 1;
-      display: flex;
-      gap: 16px;
-      font-size: 13px;
-      color: #7f8c8d;
-    }
-    .card-debits { color: #e74c3c; font-weight: 500; }
-    .card-count { color: #3498db; }
     .card-chevron {
       font-size: 12px;
       color: #bdc3c7;
+      justify-self: end;
     }
+    .card-meta {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 12px;
+      color: #7f8c8d;
+      align-items: baseline;
+    }
+    .card-debits { color: #e74c3c; font-weight: 500; }
+    .card-dot { color: #cdd1d6; }
+    .card-count { color: #3498db; }
     .card-body {
       border-top: 1px solid #f0f0f0;
       padding: 16px 20px;
@@ -160,27 +157,40 @@ interface StatementDetail {
       color: #999;
     }
     .error-small { color: #e74c3c; }
-    .transactions-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
+    .txn-list {
+      display: flex;
+      flex-direction: column;
     }
-    .transactions-table th {
-      text-align: left;
-      padding: 8px 12px;
-      color: #7f8c8d;
-      font-weight: 500;
-      border-bottom: 2px solid #ecf0f1;
-      font-size: 12px;
-      text-transform: uppercase;
-    }
-    .transactions-table td {
-      padding: 10px 12px;
+    .txn-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
       border-bottom: 1px solid #f5f5f5;
-      color: #2c3e50;
     }
-    .amount-col { text-align: right; }
-    .negative { color: #e74c3c; font-weight: 500; }
+    .txn-row:last-child { border-bottom: 0; }
+    .txn-main { flex: 1; min-width: 0; }
+    .txn-merchant {
+      font-size: 14px;
+      font-weight: 500;
+      color: #2c3e50;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .txn-meta {
+      font-size: 11px;
+      color: #95a5a6;
+      margin-top: 2px;
+    }
+    .txn-amount {
+      flex: 0 0 auto;
+      font-size: 14px;
+      font-weight: 600;
+      color: #e74c3c;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
   `]
 })
 export class AppComponent implements OnInit {
