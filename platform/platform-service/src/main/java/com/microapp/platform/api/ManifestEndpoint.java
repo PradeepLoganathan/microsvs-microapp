@@ -80,6 +80,13 @@ public class ManifestEndpoint extends AbstractHttpEndpoint {
         DEFAULT_CHANNEL,
         List.of(
             new ManifestEntry(
+                "home",
+                "1.0.0",
+                "/bundles/home/1.0.0/main.js",
+                "./Module",
+                "mf-home"
+            ),
+            new ManifestEntry(
                 "statement-details",
                 "1.0.0",
                 "/bundles/statement-details/1.0.0/main.js",

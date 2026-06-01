@@ -9,9 +9,10 @@ A prospective customer goes from stranger → engaged customer, entirely in the 
 1. **Pre-login** — cold open shows a landing page (no account yet).
 2. **Register** → an instant **personalized welcome offer**; stubbed eKYC → full customer. *(customer-service — one event-sourced id evolves VISITOR→REGISTERED→CUSTOMER)*
 3. **Onboard** — open a **CASA** account; abandon mid-flow, reopen → it **resumes exactly where you left off**; then add **Takaful** via a distinct journey. *(onboarding-service — resumable Akka Workflows)*
-4. **In the app** — balances, statements, spending analysis, product tips.
-5. **AI wealth advisor ⭐** — ask *"can I afford to save for a holiday in 2 years?"*; the agent uses real account data, reasons, and proposes a goal with a human handoff. *(advisor-service — Akka Agent + function tools, OpenAI)*
-6. **Config-driven UI** — micro-apps swap live (e.g. Statement Analysis v1→v2) by changing a manifest — no rebuild, no app-store release.
+4. **In the app — Home** — month In/Out, **Tabungs** (savings goals) with progress bars + quick contribute, and a **"moment for you"** offer card that fires when she taps a large transaction (overseas charge → multi-currency; airline charge → travel takaful). *(goals-service — Tabung ESE + view; recommendation-service — in-session NBA evaluator)*
+5. **In the app — more** — statements, spending analysis, product tips.
+6. **AI wealth advisor ⭐** — ask *"can I afford to save for a holiday in 2 years?"*; the agent uses real account data, reasons, and proposes a goal with a human handoff. *(advisor-service — Akka Agent + function tools, OpenAI)*
+7. **Config-driven UI** — micro-apps swap live (e.g. Statement Analysis v1→v2) by changing a manifest — no rebuild, no app-store release.
 
 ## Architecture
 
@@ -75,6 +76,7 @@ Bundles are pre-built and served by platform-service. To rebuild + republish:
 | advisor-service | 8086 | AI wealth advisor — conversational agent (OpenAI) |
 | onboarding-service | 8087 | Resumable CASA + Takaful onboarding workflows |
 | customer-service | 8088 | Customer lifecycle (visitor→registered→customer) + welcome offer |
+| goals-service | 8089 | Savings goals (tabung) — create, contribute, track progress |
 | platform-service | 8079 | Micro-frontend manifest + bundle server |
 | mobile banking-shell | 4200 | Ionic Angular host app |
 
@@ -112,6 +114,19 @@ curl -X POST http://localhost:8088/customers/visitor-1/kyc -H 'Content-Type: app
 curl http://localhost:8088/customers/visitor-1
 curl http://localhost:8088/customers/prelogin
 
+# Savings goals (tabung) — create, contribute, list
+curl -X POST http://localhost:8089/customers/acc-1001/goals \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Hajj 2028","category":"HAJJ","targetAmount":10000,"targetDate":"2028-06-01"}'
+curl http://localhost:8089/customers/acc-1001/goals          # all goals
+curl http://localhost:8089/customers/acc-1001/goals/active   # active only
+curl -X POST http://localhost:8089/goals/<goalId>/contribute -H 'Content-Type: application/json' -d '{"amount":250}'
+
+# NBA — in-session "moment for you" evaluator (fires when the user taps a large txn)
+curl -X POST http://localhost:8084/accounts/acc-1001/nba/evaluate \
+  -H 'Content-Type: application/json' \
+  -d '{"trigger":"LARGE_TRANSACTION_VIEWED","amount":850,"merchant":"Air Asia","category":"Travel","overseas":false}'
+
 # Manifest
 curl http://localhost:8079/microfrontends/manifest/demo
 ```
@@ -148,6 +163,7 @@ backend/
   advisor-service/        K1 — conversational wealth advisor (Agent + function tools)
   onboarding-service/     K2 — resumable CASA + Takaful onboarding (Workflows)
   customer-service/       K3 — customer lifecycle (ESE) + welcome offer
+  goals-service/          K4 — tabung savings goals (ESE + view)
 platform/
   platform-service/       micro-frontend manifest (ESE) + JS bundle server
 mobile/
@@ -156,6 +172,7 @@ mobile/
     prelogin/                 K3 — pre-login + register + welcome offer
     onboarding/               K2 — CASA/Takaful resumable wizard
     advisor/                  K1 — chat with the wealth advisor
+    home/                     K4 — in-app home: tabungs + NBA moment-of-need card
     statement-details/        statements list
     statement-analysis/       spending analysis (v1 + v2)
     recommendations/          product tips

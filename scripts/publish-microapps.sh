@@ -75,6 +75,10 @@ publish_microapp "onboarding" "1.0.0" \
 publish_microapp "prelogin" "1.0.0" \
     "$MICROAPPS_DIR/prelogin/dist/prelogin/browser"
 
+# Publish home v1 (K4) — Angular 19 outputs to dist/browser
+publish_microapp "home" "1.0.0" \
+    "$MICROAPPS_DIR/home/dist/browser"
+
 echo ""
 echo -e "${GREEN}All micro-apps published.${NC}"
 echo ""
