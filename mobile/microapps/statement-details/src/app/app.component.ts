@@ -51,7 +51,7 @@ interface StatementDetail {
           <div class="card-header">
             <div class="card-period">{{ stmt.periodStart }} — {{ stmt.periodEnd }}</div>
             <div class="card-meta">
-              <span class="card-debits">Debits: {{ stmt.totalDebits | currency }}</span>
+              <span class="card-debits">Debits: {{ stmt.totalDebits | currency:'MYR':'RM ':'1.2-2' }}</span>
               <span class="card-count">{{ stmt.transactionCount }} transactions</span>
             </div>
             <div class="card-chevron">{{ expandedStatementId === stmt.statementId ? '\u25B2' : '\u25BC' }}</div>
@@ -76,7 +76,7 @@ interface StatementDetail {
                   <td>{{ txn.merchant }}</td>
                   <td>{{ txn.category }}</td>
                   <td class="amount-col negative">
-                    -{{ txn.amount | currency }}
+                    -{{ txn.amount | currency:'MYR':'RM ':'1.2-2' }}
                   </td>
                 </tr>
               </tbody>

@@ -54,7 +54,7 @@ interface AnalysisSummary {
         <div class="overview-row">
           <div class="overview-card">
             <div class="overview-label">Total Spend</div>
-            <div class="overview-value expenses">{{ summary.totalSpend | currency }}</div>
+            <div class="overview-value expenses">{{ summary.totalSpend | currency:'MYR':'RM ':'1.2-2' }}</div>
           </div>
           <div class="overview-card">
             <div class="overview-label">Categories</div>
@@ -80,7 +80,7 @@ interface AnalysisSummary {
             <tbody>
               <tr *ngFor="let cat of summary.categories">
                 <td>{{ cat.category }}</td>
-                <td class="amount-col">{{ cat.total | currency }}</td>
+                <td class="amount-col">{{ cat.total | currency:'MYR':'RM ':'1.2-2' }}</td>
                 <td class="pct-col">{{ cat.percentage | number:'1.1-1' }}%</td>
               </tr>
             </tbody>
@@ -97,7 +97,7 @@ interface AnalysisSummary {
                 <div class="merchant-name">{{ merchant.merchant }}</div>
                 <div class="merchant-count">{{ merchant.count }} transactions</div>
               </div>
-              <div class="merchant-amount">{{ merchant.total | currency }}</div>
+              <div class="merchant-amount">{{ merchant.total | currency:'MYR':'RM ':'1.2-2' }}</div>
             </div>
           </div>
         </div>
