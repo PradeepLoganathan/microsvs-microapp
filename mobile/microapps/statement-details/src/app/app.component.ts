@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
@@ -10,6 +10,7 @@ interface Transaction {
   amount: number;
   category: string;
   description: string;
+  direction?: 'DEBIT' | 'CREDIT';
 }
 
 interface StatementSummary {
@@ -68,7 +69,9 @@ interface StatementDetail {
                   <div class="txn-merchant">{{ txn.merchant }}</div>
                   <div class="txn-meta">{{ txn.date }} · {{ txn.category }}</div>
                 </div>
-                <div class="txn-amount">-{{ txn.amount | currency:'MYR':'RM ':'1.2-2' }}</div>
+                <div class="txn-amount" [class.credit]="txn.direction === 'CREDIT'">
+                  {{ txn.direction === 'CREDIT' ? '+' : '-' }}{{ txn.amount | currency:'MYR':'RM ':'1.2-2' }}
+                </div>
               </div>
             </div>
           </div>
@@ -191,10 +194,28 @@ interface StatementDetail {
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
+    .txn-amount.credit { color: #1f7a45; }
   `]
 })
 export class AppComponent implements OnInit {
-  private readonly baseUrl = `${environment.apiBaseUrl}/accounts/acc-1001/statements`;
+  // Account context pushed in by the shell as the `account-id` attribute; switches
+  // when the user picks a different account on the home screen.
+  private _accountId = 'acc-1001';
+  private ready = false;
+
+  @Input() set accountId(value: string) {
+    if (!value || value === this._accountId) return;
+    this._accountId = value;
+    if (this.ready) {
+      this.expandedStatementId = null;
+      this.transactions = [];
+      this.loadStatements();
+    }
+  }
+
+  private get baseUrl(): string {
+    return `${environment.apiBaseUrl}/accounts/${this._accountId}/statements`;
+  }
 
   statements: StatementSummary[] = [];
   transactions: Transaction[] = [];
@@ -207,6 +228,7 @@ export class AppComponent implements OnInit {
   constructor(private http: HttpClient) {}
 
   ngOnInit(): void {
+    this.ready = true;
     this.loadStatements();
   }
 
@@ -215,7 +237,9 @@ export class AppComponent implements OnInit {
     this.error = null;
     this.http.get<StatementSummary[]>(this.baseUrl).subscribe({
       next: (data) => {
-        this.statements = data;
+        // Newest statement first.
+        this.statements = (data || []).slice()
+          .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
         this.loading = false;
       },
       error: (err) => {

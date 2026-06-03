@@ -161,19 +161,120 @@ public class StatementIntegrationTest extends TestKitSupport {
   }
 
   @Test
+  public void shouldComputeBalanceFromStatements() {
+    String accountId = uniqueAccountId();
+    String stmtId1 = "stmt-" + UUID.randomUUID().toString().substring(0, 8);
+    String stmtId2 = "stmt-" + UUID.randomUUID().toString().substring(0, 8);
+
+    // Statement record order is (.., totalDebits, totalCredits, ..)
+    createViaEntity(stmtId1, new Statement(stmtId1, accountId, "2025-12-01", "2025-12-31", 100, 500,
+        List.of(new Transaction("t1", "2025-12-02", "Shop A", 100, "Shopping", "Stuff"))));
+    createViaEntity(stmtId2, new Statement(stmtId2, accountId, "2026-01-01", "2026-01-31", 200, 500,
+        List.of(new Transaction("t2", "2026-01-05", "Shop B", 200, "Shopping", "More stuff"))));
+
+    // Balance reads the (eventually consistent) view, so await indexing.
+    Awaitility.await()
+        .ignoreExceptions()
+        .atMost(20, TimeUnit.SECONDS)
+        .untilAsserted(() -> {
+          var balance = httpClient
+              .GET("/accounts/" + accountId + "/balance")
+              .responseBodyAs(StatementEndpoint.BalanceView.class)
+              .invoke();
+          assertEquals(StatusCodes.OK, balance.status());
+          // (500-100) + (500-200) = 700
+          assertThat(balance.body().currentBalance()).isCloseTo(700.0, org.assertj.core.data.Offset.offset(0.01));
+          assertThat(balance.body().asOf()).isEqualTo("2026-01-31");
+        });
+  }
+
+  @Test
+  public void shouldReturnZeroBalanceForUnknownAccount() {
+    var balance = httpClient
+        .GET("/accounts/" + uniqueAccountId() + "/balance")
+        .responseBodyAs(StatementEndpoint.BalanceView.class)
+        .invoke();
+
+    assertEquals(StatusCodes.OK, balance.status());
+    assertThat(balance.body().currentBalance()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(0.01));
+    assertThat(balance.body().asOf()).isEmpty();
+  }
+
+  @Test
+  public void shouldOpenAccountWithOpeningBalance() {
+    String accountId = uniqueAccountId();
+
+    var openResponse = httpClient
+        .POST("/accounts/" + accountId + "/open")
+        .withRequestBody(new StatementEndpoint.OpenRequest("CASA Account", 1500.0))
+        .invoke();
+    assertEquals(StatusCodes.CREATED, openResponse.status());
+
+    // The opening statement gives the new account both a balance and a listed statement.
+    Awaitility.await()
+        .ignoreExceptions()
+        .atMost(20, TimeUnit.SECONDS)
+        .untilAsserted(() -> {
+          var balance = httpClient
+              .GET("/accounts/" + accountId + "/balance")
+              .responseBodyAs(StatementEndpoint.BalanceView.class)
+              .invoke();
+          assertThat(balance.body().currentBalance()).isCloseTo(1500.0, org.assertj.core.data.Offset.offset(0.01));
+
+          var summaries = componentClient.forView()
+              .method(StatementsByAccountView::getByAccount)
+              .invoke(accountId)
+              .statements();
+          assertThat(summaries).hasSize(1);
+          assertThat(summaries.iterator().next().statementId()).isEqualTo("stmt-open-" + accountId);
+        });
+  }
+
+  @Test
+  public void shouldAppendDebitAndCreditToCurrentStatement() {
+    String accountId = uniqueAccountId();
+
+    var debit = httpClient
+        .POST("/accounts/" + accountId + "/transactions")
+        .withRequestBody(new Transaction("t-d1", "2026-06-03", "Shop", 100.0, "Shopping", "buy", "DEBIT"))
+        .invoke();
+    assertEquals(StatusCodes.CREATED, debit.status());
+
+    var credit = httpClient
+        .POST("/accounts/" + accountId + "/transactions")
+        .withRequestBody(new Transaction("t-c1", "2026-06-03", "Transfer In", 1000.0, "Transfer", "in", "CREDIT"))
+        .invoke();
+    assertEquals(StatusCodes.CREATED, credit.status());
+
+    // Balance = credits - debits = 1000 - 100 = 900 (credit routed correctly, not to debits).
+    Awaitility.await()
+        .ignoreExceptions()
+        .atMost(20, TimeUnit.SECONDS)
+        .untilAsserted(() -> {
+          var balance = httpClient
+              .GET("/accounts/" + accountId + "/balance")
+              .responseBodyAs(StatementEndpoint.BalanceView.class)
+              .invoke();
+          assertThat(balance.body().currentBalance()).isCloseTo(900.0, org.assertj.core.data.Offset.offset(0.01));
+        });
+  }
+
+  @Test
   public void shouldSeedStatements() {
     var response = httpClient.POST("/accounts/seed").invoke();
     assertEquals(StatusCodes.OK, response.status());
 
+    // 15 debits + 2 credits (salary + transfer) per month
     Statement dec = getViaEntity("stmt-2025-12");
     assertEquals("acc-1001", dec.accountId());
-    assertEquals(15, dec.transactions().size());
+    assertEquals(17, dec.transactions().size());
+    assertEquals(2, dec.transactions().stream().filter(Transaction::isCredit).count());
 
     Statement jan = getViaEntity("stmt-2026-01");
-    assertEquals(15, jan.transactions().size());
+    assertEquals(17, jan.transactions().size());
 
     Statement feb = getViaEntity("stmt-2026-02");
-    assertEquals(15, feb.transactions().size());
+    assertEquals(17, feb.transactions().size());
   }
 
   @Test

@@ -10,15 +10,21 @@
   <meta name="msapplication-tap-highlight" content="no" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="icon" type="image/png" href="assets/icon/favicon.png" />
+  <link rel="stylesheet" href="assets/whatsapp/whatsapp.css" />
 </head>
 <body>
   <!-- .device-frame/.device-screen render the app inside a phone mockup on wide
        (desktop/demo) viewports; on narrow screens they're transparent pass-throughs.
-       See the "Phone device frame" section in styles.scss. -->
-  <div class="device-frame">
-    <div class="device-screen">
-      <app-root></app-root>
+       The .demo-stage wrapper is transparent (display:contents) unless the WhatsApp
+       demo panel is enabled with ?whatsapp=1, when it docks beside the phone. -->
+  <div class="demo-stage">
+    <div class="device-frame">
+      <div class="device-screen">
+        <app-root></app-root>
+      </div>
     </div>
+    <aside class="whatsapp-stage" id="waPanel" aria-hidden="true"></aside>
   </div>
+  <script src="assets/whatsapp/whatsapp.js" defer></script>
 </body>
 </html>

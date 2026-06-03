@@ -77,6 +77,7 @@ Bundles are pre-built and served by platform-service. To rebuild + republish:
 | onboarding-service | 8087 | Resumable CASA + Takaful onboarding workflows |
 | customer-service | 8088 | Customer lifecycle (visitor→registered→customer) + welcome offer |
 | goals-service | 8089 | Savings goals (tabung) — create, contribute, track progress |
+| payment-service | 8090 | Transfers between accounts / to beneficiaries (mock payees) |
 | platform-service | 8079 | Micro-frontend manifest + bundle server |
 | mobile banking-shell | 4200 | Ionic Angular host app |
 

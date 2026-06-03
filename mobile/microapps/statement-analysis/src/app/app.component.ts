@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
@@ -348,8 +348,20 @@ interface AnalysisSummary {
   `]
 })
 export class AppComponent implements OnInit {
-  private readonly baseUrl = `${environment.apiBaseUrl}/accounts/acc-1001/analysis`;
-  private readonly statementId = 'stmt-2025-12';
+  // Account context pushed in by the shell via the `account-id` attribute.
+  private _accountId = 'acc-1001';
+  private _statementId: string | null = null;
+  private ready = false;
+
+  @Input() set accountId(value: string) {
+    if (!value || value === this._accountId) return;
+    this._accountId = value;
+    if (this.ready) this.resolveStatementThenLoad();
+  }
+
+  private get baseUrl(): string {
+    return `${environment.apiBaseUrl}/accounts/${this._accountId}/analysis`;
+  }
 
   isV2 = environment.version === 2;
   summary: AnalysisSummary | null = null;
@@ -360,14 +372,50 @@ export class AppComponent implements OnInit {
   constructor(private http: HttpClient) {}
 
   ngOnInit(): void {
-    this.loadSummary();
+    this.ready = true;
+    this.resolveStatementThenLoad();
+  }
+
+  /**
+   * Pick the statement to analyse for the active account — the curated demo
+   * statement if the account has it, otherwise its latest — then load the summary.
+   */
+  private resolveStatementThenLoad(): void {
+    this.summary = null;
+    this.error = null;
+    const acct = this._accountId;
+    this.http.get<{ statementId: string; periodEnd: string; transactionCount: number }[]>(
+      `${environment.statementApiUrl}/accounts/${acct}/statements`)
+      .subscribe({
+        next: (summaries) => {
+          if (acct !== this._accountId) return; // superseded by a newer switch
+          if (!summaries || summaries.length === 0) {
+            this._statementId = null;
+            this.error = 'No statements to analyse for this account yet.';
+            return;
+          }
+          // Ignore empty statements (e.g. the opening statement) so analysis runs
+          // on a month with real activity.
+          const withTxns = summaries.filter((s) => s.transactionCount > 0);
+          const pool = withTxns.length ? withTxns : summaries;
+          const preferred = pool.find(s => s.statementId === environment.preferredStatementId);
+          const latest = pool.slice().sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+          this._statementId = (preferred ?? latest).statementId;
+          this.loadSummary();
+        },
+        error: (err) => {
+          this.error = 'Failed to load statements for analysis.';
+          console.error('Error resolving statement:', err);
+        },
+      });
   }
 
   runAnalysis(): void {
+    if (!this._statementId) return;
     this.runningAnalysis = true;
     this.error = null;
 
-    this.http.post(`${this.baseUrl}/run?statementId=${this.statementId}`, {}).subscribe({
+    this.http.post(`${this.baseUrl}/run?statementId=${this._statementId}`, {}).subscribe({
       next: () => {
         this.runningAnalysis = false;
         this.loadSummary();
@@ -381,10 +429,11 @@ export class AppComponent implements OnInit {
   }
 
   loadSummary(): void {
+    if (!this._statementId) return;
     this.loading = true;
     this.error = null;
 
-    this.http.get<AnalysisSummary>(`${this.baseUrl}/summary?statementId=${this.statementId}`).subscribe({
+    this.http.get<AnalysisSummary>(`${this.baseUrl}/summary?statementId=${this._statementId}`).subscribe({
       next: (data) => {
         this.summary = data;
         this.loading = false;

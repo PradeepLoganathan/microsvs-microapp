@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MBSB on WhatsApp</title>
+  <link rel="stylesheet" href="whatsapp.css" />
+  <style>
+    /* Standalone window: center the WhatsApp panel and let it fill the window,
+       overriding the "dock beside the phone" sizing used in the shell. */
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: radial-gradient(circle at 50% -10%, #1f2c33 0%, #0b141a 70%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    body.wa-on .whatsapp-stage {
+      display: flex !important;
+      width: min(440px, 100vw);
+      height: 100vh;
+    }
+    @media (min-width: 480px) and (min-height: 720px) {
+      body.wa-on .whatsapp-stage { height: min(940px, 96vh); border-radius: 28px; overflow: hidden; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="whatsapp-stage" id="waPanel" aria-hidden="true"></aside>
+  <!-- whatsapp.js still gates on ?whatsapp=1, so open this page with ?whatsapp=1 -->
+  <script src="whatsapp.js"></script>
+</body>
+</html>

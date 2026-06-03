@@ -21,6 +21,8 @@ import {
   personAdd,
   bulbOutline,
   bulb,
+  swapHorizontalOutline,
+  swapHorizontal,
 } from 'ionicons/icons';
 import { MicroAppService } from '../services/microapp.service';
 
@@ -38,11 +40,13 @@ interface ShellTab {
 }
 
 const ALL_TABS: ReadonlyArray<ShellTab> = [
+  // Onboarding is reached from the "Open a new account" CTA on Home (not a tab) —
+  // its /app/onboarding route still exists. Slot reserved for a future Pay tab.
   { path: 'home',            label: 'Home',       icon: 'home-outline',                microappName: 'home' },
+  { path: 'pay',             label: 'Pay',        icon: 'swap-horizontal-outline',     microappName: 'pay' },
   { path: 'statements',      label: 'Statements', icon: 'receipt-outline',             microappName: 'statement-details' },
   { path: 'analysis',        label: 'Analysis',   icon: 'analytics-outline',           microappName: 'statement-analysis' },
   { path: 'advisor',         label: 'Advisor',    icon: 'chatbubble-ellipses-outline', microappName: 'advisor' },
-  { path: 'onboarding',      label: 'Onboard',    icon: 'person-add-outline',          microappName: 'onboarding' },
   { path: 'recommendations', label: 'Tips',       icon: 'bulb-outline',                microappName: 'recommendations' },
 ];
 
@@ -88,6 +92,7 @@ export class TabsComponent implements OnInit {
       chatbubbleEllipsesOutline, chatbubbleEllipses,
       personAddOutline, personAdd,
       bulbOutline, bulb,
+      swapHorizontalOutline, swapHorizontal,
     });
   }
 

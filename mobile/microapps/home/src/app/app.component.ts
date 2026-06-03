@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -26,6 +26,7 @@ interface Transaction {
   amount: number;
   category: string;
   description: string;
+  direction?: 'DEBIT' | 'CREDIT';
 }
 
 interface Statement {
@@ -60,6 +61,32 @@ interface Application {
 
 interface Applications { applications: Application[]; }
 
+interface StatementSummary {
+  statementId: string;
+  accountId: string;
+  periodStart: string;
+  periodEnd: string;
+  totalDebits: number;
+  transactionCount: number;
+}
+
+interface Balance { accountId: string; currentBalance: number; asOf: string; }
+
+/** Cross-channel home-financing lead (e.g. applied via WhatsApp). */
+interface LeadView { applied: boolean; status: string; amount: number; requestedAt: string; }
+
+/** A unified card for the "Your accounts" list — primary + onboarded products. */
+interface AccountCard {
+  accountId: string;       // id used when switching the active account
+  product: 'CASA' | 'TAKAFUL';
+  productName: string;
+  accountNumber: string;   // display label
+  statusLabel: string;
+  summary: string;
+  balance: number | null;  // null until loaded / not applicable (Takaful)
+  tappable: boolean;       // CASA accounts with an assigned number can be switched to
+}
+
 interface NewGoalForm {
   name: string;
   category: string;
@@ -90,21 +117,41 @@ const TRAVEL_HINTS = ['air', 'airlines', 'airways', 'flight', 'hotel', 'agoda', 
         </div>
       </header>
 
-      <section *ngIf="accounts.length > 0" class="accounts">
+      <section *ngIf="homeLead" class="lead-banner">
+        <div class="lead-icon">🏠</div>
+        <div class="lead-main">
+          <div class="lead-title">Home Financing — application received</div>
+          <div class="lead-sub">A banker will call you about MBSB Home Financing-i. Submitted via WhatsApp.</div>
+        </div>
+      </section>
+
+      <section *ngIf="cards.length > 0" class="accounts">
         <div class="section-header">
           <h2>Your accounts</h2>
         </div>
-        <div *ngFor="let a of accounts" class="account-card" [class.account-takaful]="a.product === 'TAKAFUL'">
-          <div class="account-icon">{{ a.product === 'CASA' ? '\uD83C\uDFE6' : '\uD83D\uDEE1\uFE0F' }}</div>
+        <div *ngFor="let c of cards" class="account-card"
+             [class.account-takaful]="c.product === 'TAKAFUL'"
+             [class.tappable]="c.tappable"
+             [class.active]="isActive(c)"
+             (click)="selectAccount(c)">
+          <div class="account-icon">{{ c.product === 'CASA' ? '\uD83C\uDFE6' : '\uD83D\uDEE1\uFE0F' }}</div>
           <div class="account-main">
-            <div class="account-name">{{ a.productName }}</div>
-            <div class="account-meta">{{ a.accountNumber ? a.accountNumber : 'Pending' }}</div>
-            <div class="account-summary">{{ a.summary }}</div>
+            <div class="account-name">{{ c.productName }}</div>
+            <div class="account-meta">{{ c.accountNumber }}</div>
+            <div class="account-balance" *ngIf="c.balance !== null">RM {{ c.balance | number:'1.2-2' }}</div>
+            <div class="account-summary" *ngIf="c.balance === null">{{ c.summary }}</div>
           </div>
-          <div class="account-status-pill" [class]="'pill-' + statusTier(a.statusLabel)">
-            {{ a.statusLabel }}
+          <div class="account-right">
+            <div class="account-status-pill" [class]="'pill-' + statusTier(c.statusLabel)">
+              {{ c.statusLabel }}
+            </div>
+            <div class="account-active-tag" *ngIf="isActive(c)">Viewing</div>
           </div>
         </div>
+
+        <button class="open-account" (click)="openOnboarding()">
+          <span class="open-account-plus">＋</span> Open a new account
+        </button>
       </section>
 
       <div #nbaSlot>
@@ -217,6 +264,14 @@ const TRAVEL_HINTS = ['air', 'airlines', 'airways', 'flight', 'hotel', 'agoda', 
     .month-card.credits .month-amount { color: #b6f0c5; }
     .month-card.debits .month-amount { color: #ffd6c7; }
 
+    .lead-banner { display:flex; gap:12px; align-items:center; background:#eef6ff;
+                   border:1px solid #c9e0ff; border-left:4px solid #2456b5; border-radius:12px;
+                   padding:12px 14px; margin-bottom:16px; }
+    .lead-icon { font-size:22px; }
+    .lead-main { min-width:0; }
+    .lead-title { font-size:14px; font-weight:600; color:#1a1a2e; }
+    .lead-sub { font-size:12px; color:#4a4a55; margin-top:2px; }
+
     .accounts { margin-bottom: 16px; }
     .account-card { display: grid; grid-template-columns: auto 1fr auto; column-gap: 12px;
                     background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
@@ -236,6 +291,20 @@ const TRAVEL_HINTS = ['air', 'airlines', 'airways', 'flight', 'hotel', 'agoda', 
     .pill-active { background: #e6f6ec; color: #1f7a45; }
     .pill-pending { background: #fff4d6; color: #8a6700; }
     .pill-failed { background: #fdecea; color: #c0392b; }
+    .account-card.tappable { cursor: pointer; transition: box-shadow 0.15s ease, border-color 0.15s ease; }
+    .account-card.tappable:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.10); }
+    .account-card.active { border-left-color: #f1a800; background: #fffdf6; }
+    .account-balance { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-top: 4px;
+                       font-variant-numeric: tabular-nums; }
+    .account-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+                     align-self: center; }
+    .account-active-tag { font-size: 10px; font-weight: 700; color: #8a6700; background: #fff4d6;
+                          padding: 3px 8px; border-radius: 999px; letter-spacing: 0.4px; }
+    .open-account { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+                    background: #f6f3fc; color: #4a1f7a; border: 1.5px dashed #c3b0e3; border-radius: 12px;
+                    padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .open-account:hover { background: #efe8fa; }
+    .open-account-plus { font-size: 16px; font-weight: 700; line-height: 1; }
 
     .nba-card { background: #fff8e6; border: 1px solid #f6d57b; border-left: 4px solid #f1a800;
                 border-radius: 12px; padding: 16px 18px; margin-bottom: 16px;
@@ -316,14 +385,31 @@ const TRAVEL_HINTS = ['air', 'airlines', 'airways', 'flight', 'hotel', 'agoda', 
   `]
 })
 export class AppComponent implements OnInit {
-  private readonly accountId = environment.accountId;
-  private readonly customerId = environment.accountId; // demo: same id
-  private readonly statementId = environment.statementId;
+  // Account context, pushed in by the shell as `account-id` / `customer-id`
+  // attributes. accountId drives the data tabs (In/Out, NBA) and switches when
+  // the user taps an account; customerId is the constant logged-in customer.
+  private _accountId = environment.accountId;
+  private _customerId = environment.accountId; // demo default: same id
+  private ready = false;
+
+  @Input() set accountId(value: string) {
+    if (!value || value === this._accountId) return;
+    this._accountId = value;
+    if (this.ready) this.loadActiveAccountData();
+  }
+
+  @Input() set customerId(value: string) {
+    if (!value || value === this._customerId) return;
+    this._customerId = value;
+    if (this.ready) { this.loadAccounts(); this.loadGoals(); this.loadLead(); }
+  }
 
   @ViewChild('nbaSlot', { static: false }) nbaSlot?: ElementRef<HTMLElement>;
 
   goals: Goal[] = [];
   accounts: Application[] = [];
+  cards: AccountCard[] = [];
+  homeLead: LeadView | null = null;
   statement: Statement | null = null;
   largeTxns: Transaction[] = [];
   nbaResponse: NbaResponse | null = null;
@@ -337,11 +423,30 @@ export class AppComponent implements OnInit {
   showAdd = false;
   newGoal: NewGoalForm = { name: '', category: 'HAJJ', targetAmount: null, targetDate: '' };
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private host: ElementRef<HTMLElement>) {}
 
   ngOnInit(): void {
-    this.loadAll();
+    this.ready = true;
+    this.loadGoals();
+    this.loadAccounts();
+    this.loadActiveAccountData();
+    this.loadLead();
     this.applyTabungQueryParams();
+  }
+
+  /** Cross-channel: a home-financing lead raised on another channel (WhatsApp). */
+  private loadLead(): void {
+    this.http.get<LeadView>(
+      `${environment.advisorApiUrl}/advisor/${this._customerId}/home-financing`)
+      .subscribe({
+        next: (lead) => { this.homeLead = lead && lead.applied ? lead : null; },
+        error: () => { this.homeLead = null; },
+      });
+  }
+
+  /** Reload everything tied to the currently-active account. */
+  private loadActiveAccountData(): void {
+    this.loadStatement();
   }
 
   /**
@@ -363,19 +468,88 @@ export class AppComponent implements OnInit {
     this.showAdd = true;
   }
 
-  loadAll(): void {
-    this.loadGoals();
-    this.loadStatement();
-    this.loadAccounts();
-  }
-
   private loadAccounts(): void {
     this.http.get<Applications>(
-      `${environment.onboardingApiUrl}/onboarding/customers/${this.customerId}/applications`)
+      `${environment.onboardingApiUrl}/onboarding/customers/${this._customerId}/applications`)
       .subscribe({
-        next: (data) => { this.accounts = data.applications || []; },
-        error: (err) => { console.warn('Failed to load accounts', err); },
+        next: (data) => { this.accounts = data.applications || []; this.buildCards(); },
+        error: (err) => { console.warn('Failed to load accounts', err); this.buildCards(); },
       });
+  }
+
+  /** Build the unified account list: the customer's primary CASA + onboarded products. */
+  private buildCards(): void {
+    const primary: AccountCard = {
+      accountId: this._customerId,
+      product: 'CASA',
+      productName: 'MBSB CASA-i',
+      accountNumber: '••' + this.tail(this._customerId),
+      statusLabel: 'Active',
+      summary: 'Your everyday account',
+      balance: null,
+      tappable: true,
+    };
+
+    const fromApps: AccountCard[] = this.accounts.map((a) => ({
+      accountId: a.accountNumber,            // CASA accountId / Takaful policyNumber
+      product: a.product,
+      productName: a.productName,
+      accountNumber: a.accountNumber || 'Pending',
+      statusLabel: a.statusLabel,
+      summary: a.summary,
+      balance: null,
+      tappable: a.product === 'CASA' && !!a.accountNumber,
+    }));
+
+    this.cards = [primary, ...fromApps];
+    this.loadBalances();
+  }
+
+  /** Fetch the current balance for each switchable (CASA) account card. */
+  private loadBalances(): void {
+    this.cards
+      .filter((c) => c.tappable && c.accountId)
+      .forEach((c) => {
+        this.http.get<Balance>(
+          `${environment.statementApiUrl}/accounts/${c.accountId}/balance`)
+          .subscribe({
+            next: (b) => { c.balance = b.currentBalance; },
+            error: () => { /* leave balance null */ },
+          });
+      });
+  }
+
+  private tail(id: string): string {
+    return id.length >= 4 ? id.slice(-4) : id;
+  }
+
+  /** True when this card is the account currently driving the data tabs. */
+  isActive(card: AccountCard): boolean {
+    return card.accountId === this._accountId;
+  }
+
+  /** Ask the shell to open the onboarding flow (CASA/Takaful chooser). */
+  openOnboarding(): void {
+    this.host.nativeElement.dispatchEvent(new CustomEvent('mbsb-navigate', {
+      detail: { type: 'ONBOARD' },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  /** Tapping a switchable account asks the shell to make it the active account. */
+  selectAccount(card: AccountCard): void {
+    if (!card.tappable) return;
+    this.host.nativeElement.dispatchEvent(new CustomEvent('mbsb-select-account', {
+      detail: {
+        accountId: card.accountId,
+        customerId: this._customerId,
+        productName: card.productName,
+        accountNumber: card.accountNumber,
+      },
+      bubbles: true,
+      composed: true,
+    }));
   }
 
   statusTier(label: string): 'active' | 'pending' | 'failed' {
@@ -387,7 +561,7 @@ export class AppComponent implements OnInit {
   private loadGoals(): void {
     this.loadingGoals = true;
     this.http.get<GoalListView>(
-      `${environment.goalsApiUrl}/customers/${this.customerId}/goals/active`)
+      `${environment.goalsApiUrl}/customers/${this._customerId}/goals/active`)
       .subscribe({
         next: (data) => { this.goals = data.goals || []; this.loadingGoals = false; },
         error: (err) => {
@@ -398,12 +572,48 @@ export class AppComponent implements OnInit {
   }
 
   private loadStatement(): void {
+    // Reset active-account-scoped state before (re)loading.
+    this.statement = null;
+    this.largeTxns = [];
+    this.nbaResponse = null;
+    this.nbaTapped = false;
+    this.nbaDismissed = false;
+    this.error = null;
+
+    const acct = this._accountId;
+    // No hardcoded statement id — find the account's latest statement, then load it.
+    this.http.get<StatementSummary[]>(
+      `${environment.statementApiUrl}/accounts/${acct}/statements`)
+      .subscribe({
+        next: (summaries) => {
+          if (acct !== this._accountId) return; // a newer switch superseded this
+          if (!summaries || summaries.length === 0) { this.statement = null; return; }
+          // Ignore empty statements (e.g. the opening statement) so In/Out reflects
+          // real activity. Prefer the curated demo statement (keeps the December
+          // travel NBA story for the primary account); else the latest with data.
+          const withTxns = summaries.filter((s) => s.transactionCount > 0);
+          const pool = withTxns.length ? withTxns : summaries;
+          const preferred = pool.find((s) => s.statementId === environment.statementId);
+          const latest = pool.slice()
+            .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+          this.loadStatementDetail(acct, (preferred ?? latest).statementId);
+        },
+        error: (err) => {
+          this.error = 'Could not load statement.';
+          console.error(err);
+        },
+      });
+  }
+
+  private loadStatementDetail(acct: string, statementId: string): void {
     this.http.get<Statement>(
-      `${environment.statementApiUrl}/accounts/${this.accountId}/statements/${this.statementId}`)
+      `${environment.statementApiUrl}/accounts/${acct}/statements/${statementId}`)
       .subscribe({
         next: (stmt) => {
+          if (acct !== this._accountId) return;
           this.statement = stmt;
-          const txns = stmt.transactions || [];
+          // NBA "moments" are about spending — only consider debits (skip salary/transfers).
+          const txns = (stmt.transactions || []).filter((t) => t.direction !== 'CREDIT');
           this.largeTxns = txns
             .slice()
             .sort((a, b) => b.amount - a.amount)
@@ -434,7 +644,7 @@ export class AppComponent implements OnInit {
       overseas: overseas,
     };
     this.http.post<NbaResponse>(
-      `${environment.recommendationApiUrl}/accounts/${this.accountId}/nba/evaluate`, body)
+      `${environment.recommendationApiUrl}/accounts/${this._accountId}/nba/evaluate`, body)
       .subscribe({
         next: (resp) => {
           this.nbaResponse = resp;
@@ -499,7 +709,7 @@ export class AppComponent implements OnInit {
       targetDate: this.newGoal.targetDate,
     };
     this.http.post<Goal>(
-      `${environment.goalsApiUrl}/customers/${this.customerId}/goals`, body)
+      `${environment.goalsApiUrl}/customers/${this._customerId}/goals`, body)
       .subscribe({
         next: (created) => {
           this.goals = [created, ...this.goals];

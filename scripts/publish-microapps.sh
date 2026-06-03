@@ -79,6 +79,10 @@ publish_microapp "prelogin" "1.0.0" \
 publish_microapp "home" "1.0.0" \
     "$MICROAPPS_DIR/home/dist/browser"
 
+# Publish pay v1 — Angular 19 outputs to dist/browser
+publish_microapp "pay" "1.0.0" \
+    "$MICROAPPS_DIR/pay/dist/browser"
+
 echo ""
 echo -e "${GREEN}All micro-apps published.${NC}"
 echo ""

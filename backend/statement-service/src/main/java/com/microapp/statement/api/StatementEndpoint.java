@@ -16,6 +16,7 @@ import com.microapp.statement.domain.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
@@ -30,6 +31,12 @@ public class StatementEndpoint extends AbstractHttpEndpoint {
   public StatementEndpoint(ComponentClient componentClient) {
     this.componentClient = componentClient;
   }
+
+  /** Current cash position of an account, derived from its statements. */
+  public record BalanceView(String accountId, double currentBalance, String asOf) {}
+
+  /** Body for opening an account's first statement (opening balance). */
+  public record OpenRequest(String productName, Double openingBalance) {}
 
   @Get("/{accountId}/statements")
   public Collection<StatementSummary> getStatements(String accountId) {
@@ -72,6 +79,71 @@ public class StatementEndpoint extends AbstractHttpEndpoint {
         .toList();
   }
 
+  @Get("/{accountId}/balance")
+  public BalanceView getBalance(String accountId) {
+    var summaries = componentClient
+        .forView()
+        .method(StatementsByAccountView::getByAccount)
+        .invoke(accountId)
+        .statements();
+
+    double balance = 0.0;
+    String asOf = "";
+    for (var summary : summaries) {
+      var statement = componentClient
+          .forEventSourcedEntity(summary.statementId())
+          .method(StatementEntity::getStatement)
+          .invoke();
+      balance += statement.totalCredits() - statement.totalDebits();
+      if (statement.periodEnd().compareTo(asOf) > 0) {
+        asOf = statement.periodEnd();
+      }
+    }
+    return new BalanceView(accountId, Math.round(balance * 100.0) / 100.0, asOf);
+  }
+
+  @Post("/{accountId}/open")
+  public HttpResponse open(String accountId, OpenRequest request) {
+    double openingBalance = request.openingBalance() == null ? 0.0 : request.openingBalance();
+    var today = LocalDate.now();
+    var statementId = "stmt-open-" + accountId;
+
+    // Opening statement: the opening balance is a credit, no spending yet. Kept
+    // transaction-free so the opening credit never leaks into spending/analysis.
+    var statement = new Statement(
+        statementId, accountId,
+        today.withDayOfMonth(1).toString(), today.toString(),
+        0.0, openingBalance, List.of());
+
+    logger.info("Opening account '{}' with opening balance {}", accountId, openingBalance);
+    componentClient
+        .forEventSourcedEntity(statementId)
+        .method(StatementEntity::create)
+        .invoke(statement);
+    return HttpResponses.created();
+  }
+
+  @Post("/{accountId}/transactions")
+  public HttpResponse addCurrentTransaction(String accountId, Transaction transaction) {
+    var today = LocalDate.now();
+    var statementId = "stmt-" + accountId + "-" + today.toString().substring(0, 7); // stmt-<acct>-YYYY-MM
+
+    // Ensure the current-month statement exists (idempotent), then append the txn.
+    var skeleton = new Statement(
+        statementId, accountId,
+        today.withDayOfMonth(1).toString(),
+        today.withDayOfMonth(today.lengthOfMonth()).toString(),
+        0.0, 0.0, List.of());
+    componentClient.forEventSourcedEntity(statementId)
+        .method(StatementEntity::create).invoke(skeleton);
+
+    logger.info("Appending {} txn '{}' to current statement '{}'",
+        transaction.direction(), transaction.id(), statementId);
+    componentClient.forEventSourcedEntity(statementId)
+        .method(StatementEntity::addTransaction).invoke(transaction);
+    return HttpResponses.created();
+  }
+
   @Post("/{accountId}/statements/{statementId}/transactions")
   public HttpResponse addTransaction(String accountId, String statementId, Transaction transaction) {
     logger.info("Adding transaction '{}' to statement '{}'", transaction.id(), statementId);
@@ -80,6 +152,18 @@ public class StatementEndpoint extends AbstractHttpEndpoint {
         .method(StatementEntity::addTransaction)
         .invoke(transaction);
     return HttpResponses.created();
+  }
+
+  @Post("/{accountId}/seed-demo")
+  public HttpResponse seedDemo(String accountId) {
+    logger.info("Seeding demo statements for account '{}'", accountId);
+    MockDataProvider.getDemoStatementsFor(accountId).forEach(statement ->
+        componentClient
+            .forEventSourcedEntity(statement.statementId())
+            .method(StatementEntity::create)
+            .invoke(statement)
+    );
+    return HttpResponses.ok();
   }
 
   @Post("/seed")

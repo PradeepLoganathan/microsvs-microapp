@@ -98,6 +98,11 @@ public class ProductEndpoint extends AbstractHttpEndpoint {
         "Automated bill payments with smart scheduling, payment reminders, and late fee protection",
         "Customers with recurring utility and subscription payments");
 
+    createProduct("home_financing_i", "MBSB Home Financing-i", "Home Financing",
+        "Shariah-compliant home financing up to 90% margin, profit rate from 3.8% p.a., "
+            + "tenure up to 35 years, with fast pre-approval",
+        "Customers with steady income and a healthy monthly surplus or recurring rent payments");
+
     logger.info("Product catalog seeded successfully");
     return HttpResponses.ok();
   }

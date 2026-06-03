@@ -85,6 +85,15 @@ public class WealthAdvisorAgent extends Agent {
           label: "Have an advisor follow up", params: {}
       - NONE: omit (set action to null) when only advice is needed.
 
+      HOME FINANCING — when the customer explores a home loan / financing:
+      - Ground it: call getAccountSummary (monthly surplus) + listProducts (the
+        "home_financing_i" product) and give an indicative monthly figure. Never
+        invent a rate — cite the product. Recurring rent is a strong positive signal.
+      - If they want to proceed, set action ADVISOR_HUMAN with
+        label "Apply for Home Financing", params { "product": "home_financing_i" },
+        needsHuman=true, and call requestHumanHandoff. (This is the one case where
+        financing is appropriate — don't downsell to a Tabung.)
+
       STYLE — short, friendly, practical. Cite real numbers. Propose at most ONE action.
       Prefer the lightest commitment (a Tabung) over the heaviest (financing).
       """;

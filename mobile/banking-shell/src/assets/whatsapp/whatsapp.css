@@ -1,0 +1,109 @@
+/* WhatsApp demo panel — demo chrome rendered beside the phone (opt-in via ?whatsapp=1).
+   .demo-stage is a transparent wrapper normally (display:contents), becoming a
+   centered flex row only when the panel is on and the viewport is wide. */
+.demo-stage { display: contents; }
+.whatsapp-stage { display: none; }
+
+@media (min-width: 760px) and (min-height: 720px) {
+  body.wa-on .demo-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    width: 100%;
+    height: 100%;
+  }
+  body.wa-on .whatsapp-stage {
+    display: flex;
+    flex: 0 0 auto;
+    height: min(1010px, 96vh);
+    width: 384px;
+  }
+}
+
+.wa-phone {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  background: #0b141a;
+  box-shadow: 0 44px 100px rgba(0, 0, 0, 0.55), 0 0 0 2px #1f2c33;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.wa-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1f2c33;
+  color: #e9edef;
+  padding: 14px 14px;
+}
+.wa-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: #25d366; color: #0b141a; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.wa-peer { line-height: 1.2; }
+.wa-name { font-size: 15px; font-weight: 600; }
+.wa-status { font-size: 11px; color: #8696a0; }
+.wa-verified { color: #53bdeb; font-size: 12px; }
+
+.wa-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px;
+  background-color: #0b141a;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-msg {
+  max-width: 80%;
+  padding: 7px 10px 8px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: #e9edef;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative;
+}
+.wa-in  { align-self: flex-start; background: #202c33; border-top-left-radius: 2px; }
+.wa-out { align-self: flex-end;   background: #005c4b; border-top-right-radius: 2px; }
+.wa-time { display: block; font-size: 10px; color: #8696a0; text-align: right; margin-top: 2px; }
+
+.wa-typing { align-self: flex-start; color: #8696a0; font-size: 12px; padding: 4px 8px; }
+
+.wa-quick { display: flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; margin-top: 2px; }
+.wa-chip {
+  background: transparent; color: #53bdeb; border: 1px solid #2a3942;
+  border-radius: 16px; padding: 6px 12px; font-size: 12.5px; cursor: pointer;
+}
+.wa-chip:hover { background: #182229; }
+
+.wa-apply {
+  align-self: flex-start; margin-top: 2px;
+  background: #25d366; color: #0b141a; border: none;
+  border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.wa-apply:disabled { opacity: 0.6; cursor: default; }
+
+.wa-input {
+  display: flex; align-items: center; gap: 8px;
+  background: #1f2c33; padding: 10px 12px;
+}
+.wa-input input {
+  flex: 1; border: none; border-radius: 18px; padding: 10px 14px;
+  background: #2a3942; color: #e9edef; font-size: 13.5px; outline: none; font-family: inherit;
+}
+.wa-input input::placeholder { color: #8696a0; }
+.wa-send {
+  width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+  background: #25d366; color: #0b141a; font-size: 16px;
+}

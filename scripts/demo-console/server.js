@@ -16,7 +16,10 @@ const path = require('path');
 const PORT = parseInt(process.env.CONSOLE_PORT || '9700', 10);
 const ROOT = path.resolve(__dirname, '..', '..'); // repo root
 const PLATFORM = 'http://localhost:8079';
+const STATEMENT = 'http://localhost:8082';
+const ONBOARDING = 'http://localhost:8087';
 const CHANNEL = 'demo';
+const DEMO_CUSTOMER = 'acc-1001'; // single demo customer the app runs as
 const SHELL_PORT = 4200;
 
 const SERVICES = [
@@ -29,6 +32,7 @@ const SERVICES = [
   { name: 'onboarding-service', port: 8087 },
   { name: 'customer-service', port: 8088 },
   { name: 'goals-service', port: 8089 },
+  { name: 'payment-service', port: 8090 },
 ];
 // Canonical manifest entries used when re-adding a previously-removed micro-app.
 // Keep these in sync with platform-service's ManifestEndpoint.seedChannel().
@@ -40,6 +44,7 @@ const DEFAULT_ENTRIES = {
   'advisor':            { name: 'advisor',            version: '1.0.0', remoteEntry: '/bundles/advisor/1.0.0/main.js',            exposedModule: './Module', elementTag: 'mf-advisor' },
   'onboarding':         { name: 'onboarding',         version: '1.0.0', remoteEntry: '/bundles/onboarding/1.0.0/main.js',         exposedModule: './Module', elementTag: 'mf-onboarding' },
   'prelogin':           { name: 'prelogin',           version: '1.0.0', remoteEntry: '/bundles/prelogin/1.0.0/main.js',           exposedModule: './Module', elementTag: 'mf-prelogin' },
+  'pay':                { name: 'pay',                version: '1.0.0', remoteEntry: '/bundles/pay/1.0.0/main.js',                exposedModule: './Module', elementTag: 'mf-pay' },
 };
 
 const SEED_TARGETS = [
@@ -154,6 +159,28 @@ async function seed() {
   return out;
 }
 
+// CASA accounts the demo customer has opened (the switchable ones) — used to
+// populate the "seed statements" dropdown.
+async function listAccounts() {
+  const r = await request('GET', `${ONBOARDING}/onboarding/customers/${DEMO_CUSTOMER}/applications`);
+  if (!r.ok || r.status !== 200) return { ok: false, accounts: [] };
+  let accounts = [];
+  try {
+    const apps = JSON.parse(r.body).applications || [];
+    accounts = apps
+      .filter((a) => a.product === 'CASA' && a.accountNumber)
+      .map((a) => ({ accountId: a.accountNumber, productName: a.productName, statusLabel: a.statusLabel }));
+  } catch (_) {}
+  return { ok: true, accounts };
+}
+
+// Seed the rich demo dataset onto a specific account so it isn't empty when switched to.
+async function seedAccount(accountId) {
+  if (!accountId) return { ok: false, error: 'accountId required' };
+  const r = await request('POST', `${STATEMENT}/accounts/${encodeURIComponent(accountId)}/seed-demo`);
+  return { ok: r.ok && r.status >= 200 && r.status < 300, status: r.status, accountId };
+}
+
 function startServices() {
   try { fs.mkdirSync(path.join(ROOT, 'logs'), { recursive: true }); } catch (_) {}
   const out = fs.openSync(path.join(ROOT, 'logs', 'demo-console-start.log'), 'a');
@@ -203,6 +230,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await getStatus(u.searchParams.get('persona')));
     }
     if (u.pathname === '/api/seed' && req.method === 'POST') return send(res, 200, await seed());
+    if (u.pathname === '/api/accounts' && req.method === 'GET') return send(res, 200, await listAccounts());
+    if (u.pathname === '/api/seed-account' && req.method === 'POST') {
+      let accountId = null;
+      try { accountId = JSON.parse(await readBody(req)).accountId; } catch (_) {}
+      if (!accountId) return send(res, 400, { ok: false, error: 'body must be {accountId: string}' });
+      return send(res, 200, await seedAccount(accountId));
+    }
     if (u.pathname === '/api/start' && req.method === 'POST') return send(res, 202, { backend: startServices(), ui: startShell() });
     if (u.pathname === '/api/stop' && req.method === 'POST') return send(res, 200, await stopServices());
     if (u.pathname === '/api/version' && req.method === 'POST') {
