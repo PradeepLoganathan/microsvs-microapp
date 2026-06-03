@@ -1,13 +1,19 @@
 package com.microapp.advisor.api;
 
+import akka.http.javadsl.model.HttpResponse;
 import akka.javasdk.annotations.Acl;
+import akka.javasdk.annotations.http.Get;
 import akka.javasdk.annotations.http.HttpEndpoint;
 import akka.javasdk.annotations.http.Post;
 import akka.javasdk.client.ComponentClient;
 import akka.javasdk.http.AbstractHttpEndpoint;
+import akka.javasdk.http.HttpResponses;
+import com.microapp.advisor.application.HomeFinancingLeadEntity;
 import com.microapp.advisor.application.WealthAdvisorAgent;
 import com.microapp.advisor.domain.AdvisorResponse;
 import com.microapp.advisor.domain.AdvisorResponse.ProposedAction;
+import com.microapp.advisor.domain.HomeFinancingLead;
+import java.time.LocalDate;
 import java.util.Map;
 
 /**
@@ -47,6 +53,31 @@ public class AdvisorEndpoint extends AbstractHttpEndpoint {
             .method(WealthAdvisorAgent::ask)
             .invoke(new WealthAdvisorAgent.Question(customerId, request.message()));
     return toApi(response);
+  }
+
+  // ---- Home-financing lead (cross-channel: raised on WhatsApp, shown in the app) ----
+
+  public record ApplyHomeFinancingRequest(double amount, String note) {}
+
+  public record LeadView(boolean applied, String status, double amount, String requestedAt) {}
+
+  @Post("/{customerId}/home-financing/apply")
+  public HttpResponse applyHomeFinancing(String customerId, ApplyHomeFinancingRequest req) {
+    componentClient
+        .forKeyValueEntity(customerId)
+        .method(HomeFinancingLeadEntity::apply)
+        .invoke(new HomeFinancingLeadEntity.Apply(req.amount(), req.note() == null ? "" : req.note(),
+            LocalDate.now().toString()));
+    return HttpResponses.created();
+  }
+
+  @Get("/{customerId}/home-financing")
+  public LeadView homeFinancing(String customerId) {
+    HomeFinancingLead lead = componentClient
+        .forKeyValueEntity(customerId)
+        .method(HomeFinancingLeadEntity::get)
+        .invoke();
+    return new LeadView(lead.exists(), lead.status(), lead.amount(), lead.requestedAt());
   }
 
   private static AskResponse toApi(AdvisorResponse r) {

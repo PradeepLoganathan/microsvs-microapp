@@ -110,7 +110,9 @@ public class ManifestEndpoint extends AbstractHttpEndpoint {
             new ManifestEntry("onboarding", "1.0.0",
                 "/bundles/onboarding/1.0.0/main.js", "./Module", "mf-onboarding"),
             new ManifestEntry("prelogin", "1.0.0",
-                "/bundles/prelogin/1.0.0/main.js", "./Module", "mf-prelogin")));
+                "/bundles/prelogin/1.0.0/main.js", "./Module", "mf-prelogin"),
+            new ManifestEntry("pay", "1.0.0",
+                "/bundles/pay/1.0.0/main.js", "./Module", "mf-pay")));
 
     componentClient
         .forEventSourcedEntity(channel)

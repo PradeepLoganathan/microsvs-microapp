@@ -38,6 +38,11 @@ public class HeuristicCategorizer {
             double totalSpend = 0;
 
             for (JsonNode txn : txnArray) {
+                // Spending analysis covers debits only — skip credits (salary, transfers in).
+                JsonNode dir = txn.get("direction");
+                if (dir != null && !dir.isNull() && "CREDIT".equals(dir.asText())) {
+                    continue;
+                }
                 String category = txn.get("category").asText();
                 double amount = txn.get("amount").asDouble();
                 String merchant = txn.get("merchant").asText();

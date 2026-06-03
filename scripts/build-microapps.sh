@@ -53,6 +53,7 @@ build_microapp "advisor"
 build_microapp "onboarding"
 build_microapp "prelogin"
 build_microapp "home"
+build_microapp "pay"
 
 echo ""
 echo -e "${GREEN}All micro-apps built successfully.${NC}"

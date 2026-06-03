@@ -16,10 +16,12 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { alertCircleOutline, refreshOutline } from 'ionicons/icons';
+import { Subscription } from 'rxjs';
 import {
   MicroAppService,
   MicroAppManifestEntry,
 } from '../services/microapp.service';
+import { ActiveAccountService } from '../services/active-account.service';
 
 type LoadingState = 'loading' | 'loaded' | 'error';
 
@@ -130,24 +132,36 @@ export class MicroAppLoaderComponent implements OnInit, OnDestroy {
   errorMessage = '';
 
   private manifestEntry: MicroAppManifestEntry | null = null;
+  private renderedEl: HTMLElement | null = null;
+  private accountSub?: Subscription;
 
   constructor(
     private microAppService: MicroAppService,
+    private activeAccount: ActiveAccountService,
     private cdr: ChangeDetectorRef
   ) {
     addIcons({ alertCircleOutline, refreshOutline });
   }
 
   async ngOnInit(): Promise<void> {
+    // Push account switches onto the mounted element so the micro-app re-renders
+    // for the newly-selected account without a full reload.
+    this.accountSub = this.activeAccount.account$.subscribe(() => {
+      if (this.renderedEl) {
+        this.applyAccount(this.renderedEl);
+      }
+    });
     await this.loadMicroApp();
   }
 
   ngOnDestroy(): void {
+    this.accountSub?.unsubscribe();
     // Clean up the rendered custom element
     const host = this.hostRef?.nativeElement;
     if (host) {
       host.innerHTML = '';
     }
+    this.renderedEl = null;
   }
 
   /**
@@ -218,10 +232,23 @@ export class MicroAppLoaderComponent implements OnInit, OnDestroy {
     // Clear any previous content
     host.innerHTML = '';
 
-    // Create the custom element
+    // Create the custom element, seeded with the active account context.
     const element = document.createElement(tagName);
-    element.setAttribute('account-id', 'acc-1001');
+    this.applyAccount(element);
 
     host.appendChild(element);
+    this.renderedEl = element;
+  }
+
+  /**
+   * Pushes the active account onto the micro-app element as attributes. Angular
+   * Elements maps `account-id`/`customer-id` to @Input accountId/customerId and
+   * reacts to attribute changes, so this works for both initial render and live
+   * switches.
+   */
+  private applyAccount(element: HTMLElement): void {
+    const account = this.activeAccount.current();
+    element.setAttribute('account-id', account.accountId);
+    element.setAttribute('customer-id', account.customerId);
   }
 }

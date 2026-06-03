@@ -146,6 +146,32 @@
         Flipping this rewrites the manifest of whichever persona channel is active right now (shown above). <b>Refresh the phone (⌘⇧R)</b> to see it.
       </div>
     </section>
+
+    <!-- WhatsApp channel demo -->
+    <section class="card full">
+      <h2>WhatsApp channel — conversational home-financing demo</h2>
+      <div class="vmeta" style="margin-bottom:14px">
+        Opens a mock WhatsApp chat in its own window: a proactive Home Financing-i nudge → the <i>real</i> wealth-advisor agent (needs OPENAI_API_KEY) → <b>Apply</b> raises a lead that appears in the app's Home as a banner (cross-channel). Show it beside the banking app.
+      </div>
+      <a class="link" href="http://localhost:4200/assets/whatsapp/standalone.html?whatsapp=1"
+         target="mbsb-whatsapp" rel="noopener" onclick="openWhatsapp(event)">↗ Open WhatsApp channel (new window)</a>
+    </section>
+
+    <!-- seed statements for a newly-opened account -->
+    <section class="card full">
+      <h2>Seed statements for an account</h2>
+      <div class="vmeta" style="margin-bottom:12px">
+        A freshly-opened account is empty. Pick one and seed it the rich demo dataset so it shows real statements, balance &amp; analysis when you switch to it in the app.
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <select id="acctSelect" style="font:inherit; font-size:14px; color:var(--ink); background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-width:240px"></select>
+        <button class="ghost" onclick="loadAccounts()">↻ Refresh list</button>
+        <button id="seedAcctBtn" class="primary" onclick="seedAccount()">Seed statements</button>
+      </div>
+      <div class="vmeta" id="acctMeta" style="margin-top:12px">
+        Open a CASA account in the app first (Onboard tab → complete it), then it appears here. After seeding, switch to it in the app and hard-refresh (⌘⇧R).
+      </div>
+    </section>
   </div>
 
   <div id="toast"></div>
@@ -282,6 +308,13 @@
     window.open(appUrlFor(currentPersona()), 'mbsb-banking-app');
   }
 
+  // Open the WhatsApp channel demo in its own phone-sized window.
+  function openWhatsapp(ev) {
+    if (ev) ev.preventDefault();
+    window.open('http://localhost:4200/assets/whatsapp/standalone.html?whatsapp=1',
+        'mbsb-whatsapp', 'width=460,height=900');
+  }
+
   function setPersona(p) {
     if (p === 'default') localStorage.removeItem(PERSONA_KEY);
     else localStorage.setItem(PERSONA_KEY, p);
@@ -324,7 +357,55 @@
     refresh();
   }
 
+  // --- seed statements for a newly-opened account ---
+  async function loadAccounts() {
+    const sel = $('#acctSelect');
+    try {
+      const j = await (await fetch('/api/accounts')).json();
+      const accounts = (j && j.accounts) || [];
+      if (accounts.length === 0) {
+        sel.innerHTML = '<option value="">No opened CASA accounts yet</option>';
+      } else {
+        sel.innerHTML = accounts
+          .map((a) => `<option value="${a.accountId}">${a.productName} · ${a.accountId}</option>`)
+          .join('');
+      }
+    } catch (e) {
+      sel.innerHTML = '<option value="">Could not load accounts</option>';
+    }
+  }
+
+  async function seedAccount() {
+    const sel = $('#acctSelect');
+    const accountId = sel.value;
+    if (!accountId) { toast('Open a CASA account first, then refresh the list.'); return; }
+    const btn = $('#seedAcctBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Seeding…';
+    try {
+      const r = await fetch('/api/seed-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        toast('Seeded statements for ' + accountId + ' — switch to it in the app and hard-refresh (⌘⇧R).');
+        flashBtn2(btn, '✓ Seeded', 'ok', 2000);
+      } else {
+        toast('Could not seed: ' + (j.error || j.status));
+        flashBtn2(btn, '⚠ Failed', 'warn', 2000);
+      }
+    } catch (e) { toast('Error: ' + e); btn.innerHTML = 'Seed statements'; }
+    btn.disabled = false;
+  }
+
+  function flashBtn2(btn, html, cls, ms) {
+    btn.innerHTML = html; btn.classList.add(cls);
+    setTimeout(() => { btn.innerHTML = 'Seed statements'; btn.classList.remove(cls); }, ms);
+  }
+
   applyPersonaUI();
+  loadAccounts();
   refresh();
   setInterval(refresh, 2000);
 </script>

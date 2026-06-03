@@ -36,14 +36,15 @@ public class StatementsByAccountView extends View {
         }
         case TransactionAdded added -> {
           var current = rowState();
+          var txn = added.transaction();
           logger.info("View updating statement '{}' with new transaction '{}'",
-              current.statementId(), added.transaction().id());
+              current.statementId(), txn.id());
           yield effects().updateRow(new StatementSummary(
               current.statementId(),
               current.accountId(),
               current.periodStart(),
               current.periodEnd(),
-              current.totalDebits() + added.transaction().amount(),
+              current.totalDebits() + (txn.isCredit() ? 0.0 : txn.amount()),
               current.transactionCount() + 1
           ));
         }

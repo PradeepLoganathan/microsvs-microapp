@@ -70,15 +70,16 @@ public class StatementEntity extends EventSourcedEntity<Statement, StatementEven
           created.transactions()
       );
       case TransactionAdded added -> {
+        var txn = added.transaction();
         var updatedTxns = new ArrayList<>(currentState().transactions());
-        updatedTxns.add(added.transaction());
+        updatedTxns.add(txn);
         yield new Statement(
             currentState().statementId(),
             currentState().accountId(),
             currentState().periodStart(),
             currentState().periodEnd(),
-            currentState().totalDebits() + added.transaction().amount(),
-            currentState().totalCredits(),
+            currentState().totalDebits() + (txn.isCredit() ? 0.0 : txn.amount()),
+            currentState().totalCredits() + (txn.isCredit() ? txn.amount() : 0.0),
             updatedTxns
         );
       }

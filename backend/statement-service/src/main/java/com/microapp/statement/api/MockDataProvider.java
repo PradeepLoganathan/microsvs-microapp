@@ -3,7 +3,9 @@ package com.microapp.statement.api;
 import com.microapp.statement.domain.Statement;
 import com.microapp.statement.domain.Transaction;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Provides seeded mock data for the demo.
@@ -22,6 +24,69 @@ public final class MockDataProvider {
 
   public static List<Statement> getAllStatements() {
     return List.of(decemberStatement(), januaryStatement(), februaryStatement());
+  }
+
+  /**
+   * The 3-month dataset re-shaped for an arbitrary account — used to give a
+   * newly-opened account realistic statements on demand. Each account gets a
+   * different monthly income, scaled+jittered transaction amounts and a few
+   * dropped transactions, so balances and totals differ across accounts.
+   *
+   * Deterministic: the variation is seeded by the account id, so re-seeding (or
+   * recomputing balance) yields the same numbers for a given account. Statement
+   * ids are a global key, so they're prefixed with the account id to stay unique.
+   */
+  public static List<Statement> getDemoStatementsFor(String accountId) {
+    var rnd = new Random(accountId.hashCode());
+    double monthlyIncome = 5000 + rnd.nextInt(11) * 1000;  // RM 5,000 – 15,000
+    double spendFactor = 0.5 + rnd.nextDouble() * 0.9;     // 0.5x – 1.4x baseline spend
+
+    return getAllStatements().stream()
+        .map(s -> {
+          // Reshape only the spending (debits); income is the account's own salary.
+          var debits = s.transactions().stream()
+              .filter(t -> !t.isCredit())
+              .filter(t -> rnd.nextDouble() >= 0.2) // drop ~20% of transactions
+              .map(t -> new Transaction(
+                  t.id(), t.date(), t.merchant(),
+                  round2(t.amount() * spendFactor * (0.85 + rnd.nextDouble() * 0.3)), // ±15% jitter
+                  t.category(), t.description()))
+              .toList();
+          // Salary every month + an occasional transfer-in, varied per account.
+          double transfer = rnd.nextDouble() < 0.5 ? round2(200 + rnd.nextDouble() * 1800) : 0.0;
+          var credits = demoCredits(s.periodStart(), monthlyIncome, transfer);
+          return assemble(
+              "stmt-" + accountId + "-" + s.periodStart().substring(0, 7), // e.g. stmt-CASA-AB12-2025-12
+              accountId, s.periodStart(), s.periodEnd(), credits, debits);
+        })
+        .toList();
+  }
+
+  /** Salary credit (+ optional transfer-in) for a month — money in, not spending. */
+  private static List<Transaction> demoCredits(String periodStart, double salary, double transfer) {
+    String month = periodStart.substring(0, 7);
+    var credits = new ArrayList<Transaction>();
+    credits.add(new Transaction("cr-sal-" + month, periodStart, "Salary Credit",
+        round2(salary), "Income", "Monthly salary", "CREDIT"));
+    if (transfer > 0) {
+      credits.add(new Transaction("cr-trf-" + month, periodStart, "Transfer In",
+          round2(transfer), "Transfer", "Transfer from another account", "CREDIT"));
+    }
+    return credits;
+  }
+
+  /** Combine credits + debits into a statement, deriving the credit/debit totals. */
+  private static Statement assemble(String stmtId, String accountId, String start, String end,
+                                    List<Transaction> credits, List<Transaction> debits) {
+    var all = new ArrayList<Transaction>(credits);
+    all.addAll(debits);
+    double totalDebits = round2(debits.stream().mapToDouble(Transaction::amount).sum());
+    double totalCredits = round2(credits.stream().mapToDouble(Transaction::amount).sum());
+    return new Statement(stmtId, accountId, start, end, totalDebits, totalCredits, all);
+  }
+
+  private static double round2(double v) {
+    return Math.round(v * 100.0) / 100.0;
   }
 
   private static Statement decemberStatement() {
@@ -43,8 +108,8 @@ public final class MockDataProvider {
         new Transaction("txn-014", "2025-12-28", "Touch n Go", 50.00, "Travel", "Toll reload"),
         new Transaction("txn-015", "2025-12-30", "Maxis", 158.00, "Utilities", "Postpaid mobile bill")
     );
-    double total = txns.stream().mapToDouble(Transaction::amount).sum();
-    return new Statement("stmt-2025-12", "acc-1001", "2025-12-01", "2025-12-31", total, MONTHLY_INCOME, txns);
+    return assemble("stmt-2025-12", "acc-1001", "2025-12-01", "2025-12-31",
+        demoCredits("2025-12-01", MONTHLY_INCOME, 500.0), txns);
   }
 
   private static Statement januaryStatement() {
@@ -66,8 +131,8 @@ public final class MockDataProvider {
         new Transaction("txn-114", "2026-01-27", "Madam Kwan's", 42.50, "Dining", "Lunch at Pavilion"),
         new Transaction("txn-115", "2026-01-30", "Celcom", 138.00, "Utilities", "Postpaid mobile bill")
     );
-    double total = txns.stream().mapToDouble(Transaction::amount).sum();
-    return new Statement("stmt-2026-01", "acc-1001", "2026-01-01", "2026-01-31", total, MONTHLY_INCOME, txns);
+    return assemble("stmt-2026-01", "acc-1001", "2026-01-01", "2026-01-31",
+        demoCredits("2026-01-01", MONTHLY_INCOME, 500.0), txns);
   }
 
   private static Statement februaryStatement() {
@@ -89,7 +154,7 @@ public final class MockDataProvider {
         new Transaction("txn-214", "2026-02-18", "Kenny Rogers Roasters", 56.30, "Dining", "Family lunch"),
         new Transaction("txn-215", "2026-02-18", "Digi", 128.00, "Utilities", "Postpaid mobile bill")
     );
-    double total = txns.stream().mapToDouble(Transaction::amount).sum();
-    return new Statement("stmt-2026-02", "acc-1001", "2026-02-01", "2026-02-28", total, MONTHLY_INCOME, txns);
+    return assemble("stmt-2026-02", "acc-1001", "2026-02-01", "2026-02-28",
+        demoCredits("2026-02-01", MONTHLY_INCOME, 500.0), txns);
   }
 }
